@@ -1,0 +1,890 @@
+//----------------------------------------------------------------------------
+
+#ifndef DIM_TXT_HPP
+#define DIM_TXT_HPP 1
+
+#include <type_traits>
+#include <string>
+#include <vector>
+
+namespace dim::txt {
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>>>
+std::string
+hex(T value);
+
+std::string
+hex(const void *value);
+
+//----------------------------------------------------------------------------
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>>>
+std::string
+bin(T value);
+
+std::string
+bin(const void *value);
+
+//----------------------------------------------------------------------------
+
+void
+fmt(std::string &inout_result,
+    const char *value);
+
+void
+fmt(std::string &inout_result,
+    const std::string &value);
+
+void
+fmt(std::string &inout_result,
+    bool value);
+
+void
+fmt(std::string &inout_result,
+    char value);
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>>>
+void
+fmt(std::string &inout_result,
+    T value);
+
+void
+fmt(std::string &inout_result,
+    float value);
+
+void
+fmt(std::string &inout_result,
+    double value);
+
+template<typename Elem>
+void
+fmt(std::string &inout_result,
+    const std::vector<Elem> &value);
+
+template<typename First,
+         typename ...Args>
+void
+fmt(std::string &inout_result,
+    const char *format,
+    First first,
+    Args &&...args);
+
+template<typename ...Args>
+std::string
+txt(const char *format,
+    Args &&...args);
+
+//----------------------------------------------------------------------------
+
+template<typename ...Args>
+int // written bytes
+out(const char *format,
+    Args &&...args);
+
+template<typename ...Args>
+int // written bytes
+err(const char *format,
+    Args &&...args);
+
+//----------------------------------------------------------------------------
+
+template<typename ...Args>
+int // extraction count
+extract(const std::string &input,
+        Args &&...args);
+
+template<typename ...Args>
+int // extraction count
+extract(const char *input,
+        Args &&...args);
+
+//----------------------------------------------------------------------------
+
+std::string
+read(int capacity=0x100);
+
+std::string
+read_all(int capacity);
+
+std::string
+read_line();
+
+} // namespace dim::txt
+
+#endif // DIM_TXT_HPP
+
+//----------------------------------------------------------------------------
+// inline implementation details (don't look below!)
+//----------------------------------------------------------------------------
+
+#ifndef DIM_TXT_HPP_IMPL
+#define DIM_TXT_HPP_IMPL 1
+
+#include <cmath>
+#include <utility>
+#include <cctype>
+#include <limits>
+#include <cstring>
+
+#include <unistd.h>
+
+namespace dim::txt {
+
+namespace impl_ {
+
+template<typename Elem>
+inline
+void
+uninitialised_resize_(std::basic_string<Elem> &s,
+                      typename std::basic_string<Elem>::size_type sz)
+{
+  static_assert(std::is_pod_v<Elem>,
+                "plain-old-data elements expected");
+  struct PodElem
+  {
+    Elem uninitialised;
+    PodElem() { }; // disable zero-initialisation
+  };
+  s.reserve(sz);
+  auto &raw=reinterpret_cast<std::basic_string<PodElem> &>(s);
+  raw.resize(sz);
+}
+
+} // namespace impl_
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>>>
+inline
+std::string
+hex(T value)
+{
+  if constexpr(std::is_unsigned_v<T>)
+  {
+    constexpr auto digit_count{int(2*sizeof(T))};
+    std::string result;
+    result.reserve(digit_count);
+    constexpr const char *digits{"0123456789ABCDEF"};
+    for(int shift{4*(digit_count-1)}; shift>=0; shift-=4)
+    {
+      result+=digits[(value>>shift)&0x0F];
+    }
+    return result;
+  }
+  else
+  {
+    return hex(static_cast<std::make_unsigned_t<T>>(value));
+  }
+}
+
+inline
+std::string
+hex(const void *value)
+{
+  return hex(reinterpret_cast<std::size_t>(value));
+}
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>>>
+inline
+std::string
+bin(T value)
+{
+  if constexpr(std::is_unsigned_v<T>)
+  {
+    constexpr auto digit_count{int(8*sizeof(T))};
+    std::string result;
+    result.reserve(digit_count);
+    for(int shift{digit_count-1}; shift>=0; --shift)
+    {
+      result+=char('0'+((value>>shift)&1));
+    }
+    return result;
+  }
+  else
+  {
+    return bin(static_cast<std::make_unsigned_t<T>>(value));
+  }
+}
+
+inline
+std::string
+bin(const void *value)
+{
+  return bin(reinterpret_cast<std::size_t>(value));
+}
+
+inline
+void
+fmt(std::string &inout_result,
+    const char *value)
+{
+  inout_result+=value;
+}
+
+inline
+void
+fmt(std::string &inout_result,
+    const std::string &value)
+{
+  inout_result+=value;
+}
+
+inline
+void
+fmt(std::string &inout_result,
+    bool value)
+{
+  inout_result+=value ? "true" : "false";
+}
+
+inline
+void
+fmt(std::string &inout_result,
+    char value)
+{
+  inout_result+=value;
+}
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>>>
+inline
+void
+fmt(std::string &inout_result,
+    T value)
+{
+  if constexpr(std::is_unsigned_v<T>)
+  {
+    const T ten{10};
+    T div{1};
+    for(auto d{std::numeric_limits<T>::digits10}; d; --d)
+    {
+      div=static_cast<T>(div*ten);
+    }
+    int digit_count{0};
+    for(; div!=0; div=static_cast<T>(div/ten))
+    {
+      const auto digit{int(value/div)};
+      if(digit||(digit_count!=0))
+      {
+        inout_result+=char('0'+digit);
+        ++digit_count;
+      }
+      value=static_cast<T>(value-digit*div);
+    }
+    if(digit_count==0)
+    {
+      inout_result+='0';
+    }
+  }
+  else
+  {
+    using unsigned_type = std::make_unsigned_t<T>;
+    const auto cast_value{static_cast<unsigned_type>(value)};
+    if(value<0)
+    {
+      inout_result+='-';
+      const unsigned_type one{1};
+      const auto neg_value{static_cast<unsigned_type>(one+~cast_value)};
+      fmt(inout_result, neg_value);
+    }
+    else
+    {
+      fmt(inout_result, cast_value);
+    }
+  }
+}
+
+inline
+void
+fmt(std::string &inout_result,
+    float value)
+{
+  fmt(inout_result, static_cast<double>(value));
+}
+
+inline
+void
+fmt(std::string &inout_result,
+    double value)
+{
+  if(!std::isfinite(value))
+  {
+    inout_result+="NaN";
+  }
+  else if(value==0.0)
+  {
+    inout_result+="0.0";
+  }
+  else if(value<0.0)
+  {
+    inout_result+='-';
+    fmt(inout_result, -value);
+  }
+  else if((value>1e-4)&&(value<1e5))
+  {
+    // FIXME: last digit is not rounded towards nearest
+    double div=1e5;
+    for(int dot_pos=5, digit_count=0; digit_count<6; --dot_pos, div/=10.0)
+    {
+      const auto digit=int(value/div);
+      value=std::fmod(value, div);
+      if(digit||(digit_count!=0))
+      {
+        ++digit_count;
+      }
+      if((digit_count!=0)||(dot_pos<0))
+      {
+        inout_result+=char('0'+digit);
+      }
+      if(dot_pos==0)
+      {
+        if(digit_count==0)
+        {
+          inout_result+='0';
+        }
+        inout_result+='.';
+      }
+    }
+    auto sz=int(size(inout_result));
+    while((inout_result[sz-1]=='0')&&(inout_result[sz-2]!='.'))
+    {
+      inout_result.resize(--sz);
+    }
+  }
+  else
+  {
+    const auto exponent=std::floor(std::log10(value));
+    const auto mantissa=value/std::pow(10.0, exponent);
+    fmt(inout_result, mantissa);
+    inout_result+='e';
+    fmt(inout_result, int(exponent));
+  }
+}
+
+template<typename Elem>
+inline
+void
+fmt(std::string &inout_result,
+    const std::vector<Elem> &value)
+{
+  inout_result+='{';
+  bool first{true};
+  for(const auto &elem: value)
+  {
+    if(!first)
+    {
+      inout_result+=", ";
+    }
+    first=false;
+    fmt(inout_result, elem);
+  }
+  inout_result+='}';
+}
+
+template<typename First,
+         typename ...Args>
+inline
+void
+fmt(std::string &inout_result,
+    const char *format,
+    First first,
+    Args &&...args)
+{
+  while(*format)
+  {
+    if(*format=='%')
+    {
+      fmt(inout_result, first);
+      fmt(inout_result, ++format, std::forward<Args>(args)...);
+      return;
+    }
+    inout_result+=*format++;
+  }
+}
+
+template<typename ...Args>
+inline
+std::string
+txt(const char *format,
+    Args &&...args)
+{
+  std::string result;
+  fmt(result, format, std::forward<Args>(args)...);
+  return result;
+}
+
+template<typename ...Args>
+inline
+int // written bytes
+out(const char *format,
+    Args &&...args)
+{
+  const auto str{txt(format, std::forward<Args>(args)...)};
+  return int(::write(STDOUT_FILENO, data(str), size(str)));
+}
+
+template<typename ...Args>
+inline
+int // written bytes
+err(const char *format,
+    Args &&...args)
+{
+  const auto str{txt(format, std::forward<Args>(args)...)};
+  return int(::write(STDERR_FILENO, data(str), size(str)));
+}
+
+namespace impl_ {
+
+inline
+bool // go on
+begin_extract_(const char *&input,
+               int &remaining,
+               bool &failure)
+{
+  if(failure)
+  {
+    return false;
+  }
+  for(; remaining!=0; ++input, --remaining)
+  {
+    if(!std::isspace(*input))
+    {
+      break;
+    }
+  }
+  return true;
+}
+
+inline
+void
+extract_arg_(const char *&input,
+             int &remaining,
+             bool &failure,
+             int &count,
+             const char &literalChar)
+{
+  if(!begin_extract_(input, remaining, failure))
+  {
+    return;
+  }
+  if((remaining<1)||(*input!=literalChar))
+  {
+    failure=true;
+    return;
+  }
+  ++input;
+  --remaining;
+  ++count;
+}
+
+template<int N>
+inline
+void
+extract_arg_(const char *&input,
+             int &remaining,
+             bool &failure,
+             int &count,
+             const char(&literalString)[N])
+{
+  if(!begin_extract_(input, remaining, failure))
+  {
+    return;
+  }
+  if(remaining<N)
+  {
+    failure=true;
+    return;
+  }
+  for(int i=0; i<N-1; ++i)
+  {
+    if(input[i]!=literalString[i])
+    {
+      failure=true;
+      return;
+    }
+  }
+  input+=N-1;
+  remaining-=N-1;
+  ++count;
+}
+
+inline
+void
+extract_arg_(const char *&input,
+             int &remaining,
+             bool &failure,
+             int &count,
+             char &value)
+{
+  if(!begin_extract_(input, remaining, failure))
+  {
+    return;
+  }
+  if(remaining<1)
+  {
+    failure=true;
+    return;
+  }
+  value=*input;
+  ++input;
+  --remaining;
+  ++count;
+}
+
+inline
+void
+extract_arg_(const char *&input,
+             int &remaining,
+             bool &failure,
+             int &count,
+             std::string &value)
+{
+  if(!begin_extract_(input, remaining, failure))
+  {
+    return;
+  }
+  std::string tmp;
+  auto start{remaining};
+  for(; remaining!=0; ++input, --remaining)
+  {
+    const auto c{*input};
+    if(std::isspace(c))
+    {
+      break;
+    }
+    tmp+=c;
+  }
+  if(remaining==start)
+  {
+    failure=true;
+    return;
+  }
+  value=std::move(tmp);
+  ++count;
+}
+
+template<typename T,
+         typename = std::enable_if_t<std::is_integral_v<T>||
+                                     std::is_floating_point_v<T>>>
+inline
+void
+extract_arg_(const char *&input,
+             int &remaining,
+             bool &failure,
+             int &count,
+             T &value)
+{
+  if(!begin_extract_(input, remaining, failure))
+  {
+    return;
+  }
+  if constexpr(std::is_integral_v<T>)
+  {
+    [[maybe_unused]] bool negative=false;
+    if(remaining!=0)
+    {
+      const auto c{*input};
+      if(c=='+')
+      {
+        ++input;
+        --remaining;
+      }
+      else if(c=='-')
+      {
+        if constexpr(std::is_unsigned_v<T>)
+        {
+          failure=true;
+          return;
+        }
+        else
+        {
+          ++input;
+          --remaining;
+          negative=true;
+        }
+      }
+    }
+    auto consume_digits=[&](const auto &limit)
+    {
+      using tmp_type = std::remove_const_t<std::remove_reference_t<
+                                           decltype(limit)>>;
+      tmp_type tmp{};
+      const auto prev_limit{limit/10};
+      auto start{remaining};
+      for(; remaining!=0; ++input, --remaining)
+      {
+        const auto c{*input};
+        if(!std::isdigit(c))
+        {
+          break;
+        }
+        if(failure)
+        {
+          continue;
+        }
+        if(tmp>prev_limit)
+        {
+          failure=true;
+          continue;
+        }
+        tmp=static_cast<tmp_type>(tmp*10);
+        const auto digit{static_cast<tmp_type>(c-'0')};
+        if(limit-digit<tmp)
+        {
+          failure=true;
+          continue;
+        }
+        tmp=static_cast<tmp_type>(tmp+digit);
+      }
+      if(remaining==start)
+      {
+        failure=true;
+      }
+      return tmp;
+    };
+    if constexpr(std::is_unsigned_v<T>)
+    {
+      const auto limit{std::numeric_limits<T>::max()};
+      const auto tmp{consume_digits(limit)};
+      if(failure)
+      {
+        return;
+      }
+      value=tmp;
+      ++count;
+    }
+    else
+    {
+      using unsigned_type = std::make_unsigned_t<T>;
+      const unsigned_type one{1};
+      const auto cast_limit{static_cast<unsigned_type>(
+        negative ? std::numeric_limits<T>::min()
+                 : std::numeric_limits<T>::max())};
+      const auto neg_limit{static_cast<unsigned_type>(one+~cast_limit)};
+      const auto limit{negative ? neg_limit : cast_limit};
+      const auto tmp{consume_digits(limit)};
+      if(failure)
+      {
+        return;
+      }
+      value=static_cast<T>(negative ? one+~tmp : tmp);
+      ++count;
+    }
+  }
+  else if constexpr(std::is_floating_point_v<T>)
+  {
+    // FIXME: no overflow detected
+    const auto pos_m_sign{input};
+    if(remaining!=0)
+    {
+      const auto c{*input};
+      if((c=='-')||(c=='+'))
+      {
+        ++input;
+        --remaining;
+      }
+    }
+    const auto pos_m_int{input};
+    for(; remaining!=0; ++input, --remaining)
+    {
+      if(!std::isdigit(*input))
+      {
+        break;
+      }
+    }
+    const auto pos_m_sep{input};
+    if(remaining!=0)
+    {
+      if(*input=='.')
+      {
+        ++input;
+        --remaining;
+      }
+    }
+    const auto pos_m_frac{input};
+    for(; remaining!=0; ++input, --remaining)
+    {
+      if(!std::isdigit(*input))
+      {
+        break;
+      }
+    }
+    const auto pos_pow{input};
+    if(remaining!=0)
+    {
+      const auto c{*input};
+      if((c=='e')||(c=='E'))
+      {
+        ++input;
+        --remaining;
+      }
+    }
+    const auto pos_e_sign{input};
+    if(remaining!=0)
+    {
+      const auto c{*input};
+      if((c=='-')||(c=='+'))
+      {
+        ++input;
+        --remaining;
+      }
+    }
+    const auto pos_e_int{input};
+    for(; remaining!=0; ++input, --remaining)
+    {
+      if(!std::isdigit(*input))
+      {
+        break;
+      }
+    }
+    const auto pos_end{input};
+    const bool has_m_sign{pos_m_int>pos_m_sign};
+    const bool has_m_int{pos_m_sep>pos_m_int};
+    const bool has_m_sep{pos_m_frac>pos_m_sep};
+    const bool has_m_frac{pos_pow>pos_m_frac};
+    const bool has_pow{pos_e_sign>pos_pow};
+    const bool has_e_sign{pos_e_int>pos_e_sign};
+    const bool has_e_int{pos_end>pos_e_int};
+    if(!(has_m_int||(has_m_sep&&has_m_frac)))
+    {
+      failure=true;
+      return;
+    }
+    const T ten{10};
+    T mantissa{};
+    for(auto p{pos_m_int}; p<pos_m_sep; ++p)
+    {
+      const auto digit{static_cast<T>(*p-'0')};
+      mantissa=ten*mantissa+digit;
+    }
+    if(has_m_sep&&has_m_frac)
+    {
+      T decimal{1/ten};
+      for(auto p{pos_m_frac}; p<pos_pow; ++p)
+      {
+        const auto digit{static_cast<T>(*p-'0')};
+        mantissa+=decimal*digit;
+        decimal/=ten;
+      }
+    }
+    if(has_m_sign&&(*pos_m_sign=='-'))
+    {
+      mantissa=-mantissa;
+    }
+    T exponent{};
+    if(has_pow&&has_e_int)
+    {
+      for(auto p{pos_e_int}; p<pos_end; ++p)
+      {
+        const auto digit{static_cast<T>(*p-'0')};
+        exponent=ten*exponent+digit;
+      }
+      if(has_e_sign&&(*pos_e_sign=='-'))
+      {
+        exponent=-exponent;
+      }
+    }
+    value=mantissa*std::pow(ten, exponent);
+    ++count;
+  }
+}
+
+struct variadic_pass_
+{
+  template<typename ...T>
+  inline
+  variadic_pass_(T...)
+  {
+  }
+};
+
+} // namespace impl_
+
+template<typename ...Args>
+inline
+int // extraction count
+extract(const std::string &input,
+        Args &&...args)
+{
+  auto input_ptr{data(input)};
+  auto remaining{int(size(input))};
+  bool failure{false};
+  int count{0};
+  impl_::variadic_pass_{
+    (impl_::extract_arg_(input_ptr, remaining, failure, count,
+                         std::forward<Args>(args)), 1)...};
+  return count;
+}
+
+template<typename ...Args>
+inline
+int // extraction count
+extract(const char *input,
+        Args &&...args)
+{
+  auto remaining{int(std::strlen(input))};
+  bool failure{false};
+  int count{0};
+  impl_::variadic_pass_{
+    (impl_::extract_arg_(input, remaining, failure, count,
+                         std::forward<Args>(args)), 1)...};
+  return count;
+}
+
+inline
+std::string
+read(int capacity)
+{
+  std::string result;
+  impl_::uninitialised_resize_(result, capacity);
+  result.resize(::read(STDIN_FILENO, data(result), capacity));
+  return result;
+}
+
+inline
+std::string
+read_all(int capacity)
+{
+  std::string result;
+  impl_::uninitialised_resize_(result, capacity);
+  auto ptr{data(result)};
+  int remaining{capacity};
+  while(remaining)
+  {
+    int r{::read(STDIN_FILENO, ptr, remaining)};
+    if(r<=0)
+    {
+      break; // EOF
+    }
+    ptr+=r;
+    remaining-=r;
+  }
+  result.resize(capacity-remaining);
+  return result;
+}
+
+inline
+std::string
+read_line()
+{
+  std::string result;
+  char c;
+  while(::read(STDIN_FILENO, &c, 1)==1)
+  {
+    result+=c;
+    if(c=='\n')
+    {
+      break; // end of line
+    }
+  }
+  return result;
+}
+
+} // namespace dim::txt
+
+#endif // DIM_TXT_HPP_IMPL
+
+//----------------------------------------------------------------------------
