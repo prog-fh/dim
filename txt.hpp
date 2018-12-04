@@ -163,11 +163,11 @@ hex(T value)
 {
   if constexpr(std::is_unsigned_v<T>)
   {
-    constexpr auto digit_count{int(2*sizeof(T))};
-    std::string result;
+    constexpr auto digit_count=int(2*sizeof(T));
+    auto result=std::string{};
     result.reserve(digit_count);
-    constexpr const char *digits{"0123456789ABCDEF"};
-    for(int shift{4*(digit_count-1)}; shift>=0; shift-=4)
+    constexpr auto digits="0123456789ABCDEF";
+    for(auto shift=4*(digit_count-1); shift>=0; shift-=4)
     {
       result+=digits[(value>>shift)&0x0F];
     }
@@ -194,10 +194,10 @@ bin(T value)
 {
   if constexpr(std::is_unsigned_v<T>)
   {
-    constexpr auto digit_count{int(8*sizeof(T))};
+    constexpr auto digit_count=int(8*sizeof(T));
     std::string result;
     result.reserve(digit_count);
-    for(int shift{digit_count-1}; shift>=0; --shift)
+    for(auto shift=digit_count-1; shift>=0; --shift)
     {
       result+=char('0'+((value>>shift)&1));
     }
@@ -257,16 +257,16 @@ fmt(std::string &inout_result,
 {
   if constexpr(std::is_unsigned_v<T>)
   {
-    const T ten{10};
-    T div{1};
-    for(auto d{std::numeric_limits<T>::digits10}; d; --d)
+    constexpr auto ten=T{10};
+    auto div=T{1};
+    for(auto d=std::numeric_limits<T>::digits10; d; --d)
     {
       div=static_cast<T>(div*ten);
     }
-    int digit_count{0};
+    auto digit_count=0;
     for(; div!=0; div=static_cast<T>(div/ten))
     {
-      const auto digit{int(value/div)};
+      const auto digit=int(value/div);
       if(digit||(digit_count!=0))
       {
         inout_result+=char('0'+digit);
@@ -282,12 +282,12 @@ fmt(std::string &inout_result,
   else
   {
     using unsigned_type = std::make_unsigned_t<T>;
-    const auto cast_value{static_cast<unsigned_type>(value)};
+    const auto cast_value=static_cast<unsigned_type>(value);
     if(value<0)
     {
       inout_result+='-';
-      const unsigned_type one{1};
-      const auto neg_value{static_cast<unsigned_type>(one+~cast_value)};
+      constexpr auto one=unsigned_type{1};
+      const auto neg_value=static_cast<unsigned_type>(one+~cast_value);
       fmt(inout_result, neg_value);
     }
     else
@@ -326,8 +326,8 @@ fmt(std::string &inout_result,
   else if((value>1e-4)&&(value<1e5))
   {
     // FIXME: last digit is not rounded towards nearest
-    double div=1e5;
-    for(int dot_pos=5, digit_count=0; digit_count<6; --dot_pos, div/=10.0)
+    auto div=1e5;
+    for(auto dot_pos=5, digit_count=0; digit_count<6; --dot_pos, div/=10.0)
     {
       const auto digit=int(value/div);
       value=std::fmod(value, div);
@@ -371,7 +371,7 @@ fmt(std::string &inout_result,
     const std::vector<Elem> &value)
 {
   inout_result+='{';
-  bool first{true};
+  auto first=true;
   for(const auto &elem: value)
   {
     if(!first)
@@ -411,7 +411,7 @@ std::string
 txt(const char *format,
     Args &&...args)
 {
-  std::string result;
+  auto result=std::string{};
   fmt(result, format, std::forward<Args>(args)...);
   return result;
 }
@@ -422,7 +422,7 @@ int // written bytes
 out(const char *format,
     Args &&...args)
 {
-  const auto str{txt(format, std::forward<Args>(args)...)};
+  const auto str=txt(format, std::forward<Args>(args)...);
   return int(::write(STDOUT_FILENO, data(str), size(str)));
 }
 
@@ -432,7 +432,7 @@ int // written bytes
 err(const char *format,
     Args &&...args)
 {
-  const auto str{txt(format, std::forward<Args>(args)...)};
+  const auto str=txt(format, std::forward<Args>(args)...);
   return int(::write(STDERR_FILENO, data(str), size(str)));
 }
 
@@ -498,7 +498,7 @@ extract_arg_(const char *&input,
     failure=true;
     return;
   }
-  for(int i=0; i<N-1; ++i)
+  for(auto i=0; i<N-1; ++i)
   {
     if(input[i]!=literalString[i])
     {
@@ -546,11 +546,11 @@ extract_arg_(const char *&input,
   {
     return;
   }
-  std::string tmp;
-  auto start{remaining};
+  auto tmp=std::string{};
+  auto start=remaining;
   for(; remaining!=0; ++input, --remaining)
   {
-    const auto c{*input};
+    const auto c=*input;
     if(std::isspace(c))
     {
       break;
@@ -583,10 +583,10 @@ extract_arg_(const char *&input,
   }
   if constexpr(std::is_integral_v<T>)
   {
-    [[maybe_unused]] bool negative=false;
+    [[maybe_unused]] auto negative=false;
     if(remaining!=0)
     {
-      const auto c{*input};
+      const auto c=*input;
       if(c=='+')
       {
         ++input;
@@ -611,12 +611,12 @@ extract_arg_(const char *&input,
     {
       using tmp_type = std::remove_const_t<std::remove_reference_t<
                                            decltype(limit)>>;
-      tmp_type tmp{};
-      const auto prev_limit{limit/10};
-      auto start{remaining};
+      auto tmp=tmp_type{};
+      const auto prev_limit=limit/10;
+      auto start=remaining;
       for(; remaining!=0; ++input, --remaining)
       {
-        const auto c{*input};
+        const auto c=*input;
         if(!std::isdigit(c))
         {
           break;
@@ -631,7 +631,7 @@ extract_arg_(const char *&input,
           continue;
         }
         tmp=static_cast<tmp_type>(tmp*10);
-        const auto digit{static_cast<tmp_type>(c-'0')};
+        const auto digit=static_cast<tmp_type>(c-'0');
         if(limit-digit<tmp)
         {
           failure=true;
@@ -647,8 +647,8 @@ extract_arg_(const char *&input,
     };
     if constexpr(std::is_unsigned_v<T>)
     {
-      const auto limit{std::numeric_limits<T>::max()};
-      const auto tmp{consume_digits(limit)};
+      const auto limit=std::numeric_limits<T>::max();
+      const auto tmp=consume_digits(limit);
       if(failure)
       {
         return;
@@ -659,13 +659,13 @@ extract_arg_(const char *&input,
     else
     {
       using unsigned_type = std::make_unsigned_t<T>;
-      const unsigned_type one{1};
-      const auto cast_limit{static_cast<unsigned_type>(
+      constexpr auto one=unsigned_type{1};
+      const auto cast_limit=static_cast<unsigned_type>(
         negative ? std::numeric_limits<T>::min()
-                 : std::numeric_limits<T>::max())};
-      const auto neg_limit{static_cast<unsigned_type>(one+~cast_limit)};
-      const auto limit{negative ? neg_limit : cast_limit};
-      const auto tmp{consume_digits(limit)};
+                 : std::numeric_limits<T>::max());
+      const auto neg_limit=static_cast<unsigned_type>(one+~cast_limit);
+      const auto limit=negative ? neg_limit : cast_limit;
+      const auto tmp=consume_digits(limit);
       if(failure)
       {
         return;
@@ -677,17 +677,17 @@ extract_arg_(const char *&input,
   else if constexpr(std::is_floating_point_v<T>)
   {
     // FIXME: no overflow detected
-    const auto pos_m_sign{input};
+    const auto pos_m_sign=input;
     if(remaining!=0)
     {
-      const auto c{*input};
+      const auto c=*input;
       if((c=='-')||(c=='+'))
       {
         ++input;
         --remaining;
       }
     }
-    const auto pos_m_int{input};
+    const auto pos_m_int=input;
     for(; remaining!=0; ++input, --remaining)
     {
       if(!std::isdigit(*input))
@@ -695,7 +695,7 @@ extract_arg_(const char *&input,
         break;
       }
     }
-    const auto pos_m_sep{input};
+    const auto pos_m_sep=input;
     if(remaining!=0)
     {
       if(*input=='.')
@@ -704,7 +704,7 @@ extract_arg_(const char *&input,
         --remaining;
       }
     }
-    const auto pos_m_frac{input};
+    const auto pos_m_frac=input;
     for(; remaining!=0; ++input, --remaining)
     {
       if(!std::isdigit(*input))
@@ -712,27 +712,27 @@ extract_arg_(const char *&input,
         break;
       }
     }
-    const auto pos_pow{input};
+    const auto pos_pow=input;
     if(remaining!=0)
     {
-      const auto c{*input};
+      const auto c=*input;
       if((c=='e')||(c=='E'))
       {
         ++input;
         --remaining;
       }
     }
-    const auto pos_e_sign{input};
+    const auto pos_e_sign=input;
     if(remaining!=0)
     {
-      const auto c{*input};
+      const auto c=*input;
       if((c=='-')||(c=='+'))
       {
         ++input;
         --remaining;
       }
     }
-    const auto pos_e_int{input};
+    const auto pos_e_int=input;
     for(; remaining!=0; ++input, --remaining)
     {
       if(!std::isdigit(*input))
@@ -740,32 +740,32 @@ extract_arg_(const char *&input,
         break;
       }
     }
-    const auto pos_end{input};
-    const bool has_m_sign{pos_m_int>pos_m_sign};
-    const bool has_m_int{pos_m_sep>pos_m_int};
-    const bool has_m_sep{pos_m_frac>pos_m_sep};
-    const bool has_m_frac{pos_pow>pos_m_frac};
-    const bool has_pow{pos_e_sign>pos_pow};
-    const bool has_e_sign{pos_e_int>pos_e_sign};
-    const bool has_e_int{pos_end>pos_e_int};
+    const auto pos_end=input;
+    const auto has_m_sign=pos_m_int>pos_m_sign;
+    const auto has_m_int=pos_m_sep>pos_m_int;
+    const auto has_m_sep=pos_m_frac>pos_m_sep;
+    const auto has_m_frac=pos_pow>pos_m_frac;
+    const auto has_pow=pos_e_sign>pos_pow;
+    const auto has_e_sign=pos_e_int>pos_e_sign;
+    const auto has_e_int=pos_end>pos_e_int;
     if(!(has_m_int||(has_m_sep&&has_m_frac)))
     {
       failure=true;
       return;
     }
-    const T ten{10};
-    T mantissa{};
-    for(auto p{pos_m_int}; p<pos_m_sep; ++p)
+    constexpr auto ten=T{10};
+    auto mantissa=T{};
+    for(auto p=pos_m_int; p<pos_m_sep; ++p)
     {
-      const auto digit{static_cast<T>(*p-'0')};
+      const auto digit=static_cast<T>(*p-'0');
       mantissa=ten*mantissa+digit;
     }
     if(has_m_sep&&has_m_frac)
     {
-      T decimal{1/ten};
-      for(auto p{pos_m_frac}; p<pos_pow; ++p)
+      auto decimal=T{1/ten};
+      for(auto p=pos_m_frac; p<pos_pow; ++p)
       {
-        const auto digit{static_cast<T>(*p-'0')};
+        const auto digit=static_cast<T>(*p-'0');
         mantissa+=decimal*digit;
         decimal/=ten;
       }
@@ -774,12 +774,12 @@ extract_arg_(const char *&input,
     {
       mantissa=-mantissa;
     }
-    T exponent{};
+    auto exponent=T{};
     if(has_pow&&has_e_int)
     {
-      for(auto p{pos_e_int}; p<pos_end; ++p)
+      for(auto p=pos_e_int; p<pos_end; ++p)
       {
-        const auto digit{static_cast<T>(*p-'0')};
+        const auto digit=static_cast<T>(*p-'0');
         exponent=ten*exponent+digit;
       }
       if(has_e_sign&&(*pos_e_sign=='-'))
@@ -809,10 +809,10 @@ int // extraction count
 extract(const std::string &input,
         Args &&...args)
 {
-  auto input_ptr{data(input)};
-  auto remaining{int(size(input))};
-  bool failure{false};
-  int count{0};
+  auto input_ptr=data(input);
+  auto remaining=int(size(input));
+  auto failure=false;
+  auto count=0;
   impl_::variadic_pass_{
     (impl_::extract_arg_(input_ptr, remaining, failure, count,
                          std::forward<Args>(args)), 1)...};
@@ -825,9 +825,9 @@ int // extraction count
 extract(const char *input,
         Args &&...args)
 {
-  auto remaining{int(std::strlen(input))};
-  bool failure{false};
-  int count{0};
+  auto remaining=int(std::strlen(input));
+  auto failure=false;
+  auto count=0;
   impl_::variadic_pass_{
     (impl_::extract_arg_(input, remaining, failure, count,
                          std::forward<Args>(args)), 1)...};
@@ -838,7 +838,7 @@ inline
 std::string
 read(int capacity)
 {
-  std::string result;
+  auto result=std::string{};
   impl_::uninitialised_resize_(result, capacity);
   result.resize(::read(STDIN_FILENO, data(result), capacity));
   return result;
@@ -848,13 +848,13 @@ inline
 std::string
 read_all(int capacity)
 {
-  std::string result;
+  auto result=std::string{};
   impl_::uninitialised_resize_(result, capacity);
-  auto ptr{data(result)};
-  int remaining{capacity};
+  auto ptr=data(result);
+  auto remaining=capacity;
   while(remaining)
   {
-    int r{::read(STDIN_FILENO, ptr, remaining)};
+    auto r=::read(STDIN_FILENO, ptr, remaining);
     if(r<=0)
     {
       break; // EOF
@@ -870,8 +870,8 @@ inline
 std::string
 read_line()
 {
-  std::string result;
-  char c;
+  auto result=std::string{};
+  auto c=char{};
   while(::read(STDIN_FILENO, &c, 1)==1)
   {
     result+=c;
