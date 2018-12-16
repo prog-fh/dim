@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
-#ifndef DIM_ONEOF_HPP
-#define DIM_ONEOF_HPP 1
+#ifndef DIM_ENUMTYPE_HPP
+#define DIM_ENUMTYPE_HPP 1
 
 /**
 inspired from
@@ -18,43 +18,43 @@ https://godbolt.org/#g:!((g:!((g:!((h:codeEditor,i:(j:1,lang:c%2B%2B,source:'%23
 namespace dim {
 
 template<typename ...Types>
-class OneOf final
+class EnumType final
 {
 public:
 
-  OneOf();
+  EnumType();
 
   template<typename T,
-           typename = std::enable_if_t<!std::is_convertible_v<T, OneOf>>>
+           typename = std::enable_if_t<!std::is_convertible_v<T, EnumType>>>
   explicit
-  OneOf(const T &rhs);
+  EnumType(const T &rhs);
 
   template<typename T,
-           typename = std::enable_if_t<!std::is_convertible_v<T, OneOf>>>
-  OneOf &
+           typename = std::enable_if_t<!std::is_convertible_v<T, EnumType>>>
+  EnumType &
   operator=(const T &rhs);
 
   template<typename T,
-           typename = std::enable_if_t<!std::is_convertible_v<T, OneOf>>>
+           typename = std::enable_if_t<!std::is_convertible_v<T, EnumType>>>
   explicit
-  OneOf(T &&rhs) noexcept;
+  EnumType(T &&rhs) noexcept;
 
   template<typename T,
-           typename = std::enable_if_t<!std::is_convertible_v<T, OneOf>>>
-  OneOf &
+           typename = std::enable_if_t<!std::is_convertible_v<T, EnumType>>>
+  EnumType &
   operator=(T &&rhs) noexcept;
 
-  OneOf(const OneOf &rhs);
+  EnumType(const EnumType &rhs);
 
-  OneOf &
-  operator=(const OneOf &rhs);
+  EnumType &
+  operator=(const EnumType &rhs);
   
-  OneOf(OneOf &&rhs) noexcept;
+  EnumType(EnumType &&rhs) noexcept;
 
-  OneOf &
-  operator=(OneOf &&rhs) noexcept;
+  EnumType &
+  operator=(EnumType &&rhs) noexcept;
 
-  ~OneOf();
+  ~EnumType();
 
   template<typename T>
   bool
@@ -89,9 +89,9 @@ private:
   using Rank = unsigned char;
 
   static_assert(sizeof...(Types)>0,
-    "at least one type is required for OneOf<>");
+    "at least one type is required for EnumType<>");
   static_assert(sizeof...(Types)>>(8*sizeof(Rank))==0,
-    "too many types for OneOf<>");
+    "too many types for EnumType<>");
 
   template<typename ...>
   struct TypeRank;
@@ -114,13 +114,13 @@ private:
            typename ...Tail>
   void
   copyInit_(Rank rank,
-            const OneOf &rhs);
+            const EnumType &rhs);
 
   template<typename Head,
            typename ...Tail>
   void
   moveInit_(Rank rank,
-            OneOf &&rhs);
+            EnumType &&rhs);
 
   template<typename Head,
            typename ...Tail>
@@ -147,14 +147,14 @@ private:
 
 } // namespace dim
 
-#endif // DIM_ONEOF_HPP
+#endif // DIM_ENUMTYPE_HPP
 
 //----------------------------------------------------------------------------
 // inline implementation details (don't look below!)
 //----------------------------------------------------------------------------
 
-#ifndef DIM_ONEOF_HPP_IMPL
-#define DIM_ONEOF_HPP_IMPL 1
+#ifndef DIM_ENUMTYPE_HPP_IMPL
+#define DIM_ENUMTYPE_HPP_IMPL 1
 
 #include <utility>
 #include <typeinfo>
@@ -163,7 +163,7 @@ namespace dim {
 
 template<typename ...Types>
 inline
-OneOf<Types...>::OneOf()
+EnumType<Types...>::EnumType()
 : rank_{0}
 , storage_{}
 {
@@ -174,8 +174,8 @@ template<typename ...Types>
 template<typename T,
          typename>
 inline
-OneOf<Types...>::OneOf(const T &rhs)
-: OneOf{}
+EnumType<Types...>::EnumType(const T &rhs)
+: EnumType{}
 {
   set<T>(rhs);
 }
@@ -184,8 +184,8 @@ template<typename ...Types>
 template<typename T,
          typename>
 inline
-OneOf<Types...> &
-OneOf<Types...>::operator=(const T &rhs)
+EnumType<Types...> &
+EnumType<Types...>::operator=(const T &rhs)
 {
   if(reinterpret_cast<const void *>(&rhs)!=
      reinterpret_cast<const void *>(&storage_))
@@ -199,8 +199,8 @@ template<typename ...Types>
 template<typename T,
          typename>
 inline
-OneOf<Types...>::OneOf(T &&rhs) noexcept
-: OneOf{}
+EnumType<Types...>::EnumType(T &&rhs) noexcept
+: EnumType{}
 {
   set<T>(std::move(rhs));
 }
@@ -209,8 +209,8 @@ template<typename ...Types>
 template<typename T,
          typename>
 inline
-OneOf<Types...> &
-OneOf<Types...>::operator=(T &&rhs) noexcept
+EnumType<Types...> &
+EnumType<Types...>::operator=(T &&rhs) noexcept
 {
   if(reinterpret_cast<const void *>(&rhs)!=
      reinterpret_cast<const void *>(&storage_))
@@ -222,7 +222,7 @@ OneOf<Types...>::operator=(T &&rhs) noexcept
 
 template<typename ...Types>
 inline
-OneOf<Types...>::OneOf(const OneOf &rhs)
+EnumType<Types...>::EnumType(const EnumType &rhs)
 : rank_{rhs.rank_}
 , storage_{}
 {
@@ -231,8 +231,8 @@ OneOf<Types...>::OneOf(const OneOf &rhs)
 
 template<typename ...Types>
 inline
-OneOf<Types...> &
-OneOf<Types...>::operator=(const OneOf &rhs)
+EnumType<Types...> &
+EnumType<Types...>::operator=(const EnumType &rhs)
 {
   if(&rhs!=this)
   {
@@ -248,7 +248,7 @@ OneOf<Types...>::operator=(const OneOf &rhs)
 
 template<typename ...Types>
 inline
-OneOf<Types...>::OneOf(OneOf &&rhs) noexcept
+EnumType<Types...>::EnumType(EnumType &&rhs) noexcept
 : rank_{rhs.rank_}
 , storage_{}
 {
@@ -258,8 +258,8 @@ OneOf<Types...>::OneOf(OneOf &&rhs) noexcept
 
 template<typename ...Types>
 inline
-OneOf<Types...> &
-OneOf<Types...>::operator=(OneOf &&rhs) noexcept
+EnumType<Types...> &
+EnumType<Types...>::operator=(EnumType &&rhs) noexcept
 {
   if(&rhs!=this)
   {
@@ -276,7 +276,7 @@ OneOf<Types...>::operator=(OneOf &&rhs) noexcept
 
 template<typename ...Types>
 inline
-OneOf<Types...>::~OneOf()
+EnumType<Types...>::~EnumType()
 {
   if(rank_)
   {
@@ -288,7 +288,7 @@ template<typename ...Types>
 template<typename T>
 inline
 bool
-OneOf<Types...>::is() const
+EnumType<Types...>::is() const
 {
   return rank_==TypeRank_v<T, void, Types...>;
 }
@@ -297,7 +297,7 @@ template<typename ...Types>
 template<typename T>
 inline
 T &
-OneOf<Types...>::get()
+EnumType<Types...>::get()
 {
   if(rank_==TypeRank_v<T, void, Types...>)
   {
@@ -313,7 +313,7 @@ template<typename ...Types>
 template<typename T>
 inline
 const T &
-OneOf<Types...>::get() const
+EnumType<Types...>::get() const
 {
   if(rank_==TypeRank_v<T, void, Types...>)
   {
@@ -330,7 +330,7 @@ template<typename T,
          typename ...Args>
 inline
 void
-OneOf<Types...>::set(Args &&...args)
+EnumType<Types...>::set(Args &&...args)
 {
   if(rank_)
   {
@@ -343,7 +343,7 @@ OneOf<Types...>::set(Args &&...args)
 template<typename ...Types>
 inline
 void
-OneOf<Types...>::clear()
+EnumType<Types...>::clear()
 {
   destroy_<Types...>(rank_);
   rank_=0;
@@ -353,7 +353,7 @@ template<typename ...Types>
 template<typename ...Functions>
 inline
 decltype(auto)
-OneOf<Types...>::use(Functions &&...fncts)
+EnumType<Types...>::use(Functions &&...fncts)
 {
   struct Dispatcher : Functions... { using Functions::operator()...; };
   return use_<Dispatcher, Types...>
@@ -364,7 +364,7 @@ template<typename ...Types>
 template<typename ...Functions>
 inline
 decltype(auto)
-OneOf<Types...>::use(Functions &&...fncts) const
+EnumType<Types...>::use(Functions &&...fncts) const
 {
   struct Dispatcher : Functions... { using Functions::operator()...; };
   return use_<Dispatcher, Types...>
@@ -376,8 +376,8 @@ template<typename Head,
          typename ...Tail>
 inline
 void
-OneOf<Types...>::copyInit_(Rank rank,
-                           const OneOf &rhs)
+EnumType<Types...>::copyInit_(Rank rank,
+                              const EnumType &rhs)
 {
   if(rank==1)
   {
@@ -395,8 +395,8 @@ template<typename Head,
          typename ...Tail>
 inline
 void
-OneOf<Types...>::moveInit_(Rank rank,
-                           OneOf &&rhs)
+EnumType<Types...>::moveInit_(Rank rank,
+                              EnumType &&rhs)
 {
   if(rank==1)
   {
@@ -414,7 +414,7 @@ template<typename Head,
          typename ...Tail>
 inline
 void
-OneOf<Types...>::destroy_(Rank rank)
+EnumType<Types...>::destroy_(Rank rank)
 {
   if(rank==1)
   {
@@ -433,8 +433,8 @@ template<typename Function,
          typename ...Tail>
 inline
 decltype(auto)
-OneOf<Types...>::use_(Rank rank,
-                      Function &&fnct)
+EnumType<Types...>::use_(Rank rank,
+                         Function &&fnct)
 {
   if(rank>1)
   {
@@ -452,8 +452,8 @@ template<typename Function,
          typename ...Tail>
 inline
 decltype(auto)
-OneOf<Types...>::use_(Rank rank,
-                      Function &&fnct) const
+EnumType<Types...>::use_(Rank rank,
+                         Function &&fnct) const
 {
   if(rank>1)
   {
@@ -467,6 +467,6 @@ OneOf<Types...>::use_(Rank rank,
 
 } // namespace dim
 
-#endif // DIM_ONEOF_HPP_IMPL
+#endif // DIM_ENUMTYPE_HPP_IMPL
 
 //----------------------------------------------------------------------------
