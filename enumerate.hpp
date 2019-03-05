@@ -88,7 +88,7 @@ enumerate(Counter to_count);
 namespace dim {
 
 template<typename Container,
-         typename> // SFINAE
+         typename = std::enable_if_t<can_enumerate_v<Container>>>
 inline
 auto
 enumerate(Container &&container)
@@ -123,7 +123,7 @@ enumerate(Container &&container)
 }
 
 template<typename Container,
-         typename> // SFINAE
+         typename = std::enable_if_t<can_enumerate_v<Container>>>
 inline
 auto
 cenumerate(const Container &container)
@@ -132,7 +132,7 @@ cenumerate(const Container &container)
 }
 
 template<typename Counter,
-         typename> // SFINAE
+         typename = std::enable_if_t<can_count_v<Counter>>>
 inline
 auto
 enumerate(Counter from_count,
@@ -156,7 +156,7 @@ enumerate(Counter from_count,
 }
 
 template<typename Counter,
-         typename> // SFINAE
+         typename = std::enable_if_t<can_count_v<Counter>>>
 inline
 auto
 enumerate(Counter to_count)
