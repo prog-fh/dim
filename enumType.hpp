@@ -18,7 +18,7 @@ https://godbolt.org/#g:!((g:!((g:!((h:codeEditor,i:(j:1,lang:c%2B%2B,source:'%23
 namespace dim {
 
 template<typename ...Types>
-class EnumType final
+class EnumType
 {
 public:
 
