@@ -161,7 +161,7 @@ inline
 auto
 enumerate(Counter to_count)
 {
-  return enumerate(0, to_count);
+  return enumerate(Counter{}, to_count);
 }
 
 } // namespace dim
