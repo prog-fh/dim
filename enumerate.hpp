@@ -13,62 +13,37 @@ inspired from
 
 namespace dim {
 
-template<typename, typename = std::void_t<>>
-struct has_begin : std::false_type { };
 template<typename Container>
-struct has_begin<Container,
-  std::void_t<decltype(*begin(std::declval<Container>()))>>
-  : std::true_type { };
-
-template<typename, typename = std::void_t<>>
-struct has_end : std::false_type { };
-template<typename Container>
-struct has_end<Container,
-  std::void_t<decltype(*end(std::declval<Container>()))>>
-  : std::true_type { };
-
-template<typename, typename = std::void_t<>>
-struct has_size : std::false_type { };
-template<typename Container>
-struct has_size<Container,
-  std::void_t<decltype(size(std::declval<Container>()))>>
-  : std::true_type { };
-
-template<typename Container>
-using can_enumerate = std::conjunction<
-  has_begin<Container>,
-  has_end<Container>,
-  has_size<Container>>;
-
-template<typename Container>
-inline constexpr auto can_enumerate_v = can_enumerate<Container>::value;
+using enumerate_container_support =
+  decltype(*begin(std::declval<Container>()),
+           *end(std::declval<Container>()),
+           size(std::declval<Container>()),
+           1);
 
 template<typename Container,
-         typename = std::enable_if_t<can_enumerate_v<Container>>>
+         enumerate_container_support<Container> =1>
 auto // iterable 
 enumerate(Container &&container);
 
 template<typename Container,
-         typename = std::enable_if_t<can_enumerate_v<Container>>>
+         enumerate_container_support<Container> =1>
 auto // iterable
 cenumerate(const Container &container);
 
 template<typename Counter>
-using can_count = std::conjunction<
-  std::is_integral<Counter>,
-  std::negation<std::is_same<bool, Counter>>>;
-
-template<typename Counter>
-inline constexpr auto can_count_v = can_count<Counter>::value;
+using enumerate_counter_support =
+  decltype(std::declval<Counter>()!=std::declval<Counter>(),
+           ++std::declval<std::add_lvalue_reference_t<Counter>>(),
+           1);
 
 template<typename Counter,
-         typename = std::enable_if_t<can_count_v<Counter>>>
+         enumerate_counter_support<Counter> =1>
 auto
 enumerate(Counter from_count,
           Counter to_count);
 
 template<typename Counter,
-         typename = std::enable_if_t<can_count_v<Counter>>>
+         enumerate_counter_support<Counter> =1>
 auto
 enumerate(Counter to_count);
 
@@ -88,7 +63,7 @@ enumerate(Counter to_count);
 namespace dim {
 
 template<typename Container,
-         typename = std::enable_if_t<can_enumerate_v<Container>>>
+         enumerate_container_support<Container> =1>
 inline
 auto
 enumerate(Container &&container)
@@ -123,7 +98,7 @@ enumerate(Container &&container)
 }
 
 template<typename Container,
-         typename = std::enable_if_t<can_enumerate_v<Container>>>
+         enumerate_container_support<Container> =1>
 inline
 auto
 cenumerate(const Container &container)
@@ -132,7 +107,7 @@ cenumerate(const Container &container)
 }
 
 template<typename Counter,
-         typename = std::enable_if_t<can_count_v<Counter>>>
+         enumerate_counter_support<Counter> =1>
 inline
 auto
 enumerate(Counter from_count,
@@ -156,7 +131,7 @@ enumerate(Counter from_count,
 }
 
 template<typename Counter,
-         typename = std::enable_if_t<can_count_v<Counter>>>
+         enumerate_counter_support<Counter> =1>
 inline
 auto
 enumerate(Counter to_count)
