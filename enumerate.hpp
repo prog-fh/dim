@@ -63,7 +63,7 @@ enumerate(Counter to_count);
 namespace dim {
 
 template<typename Container,
-         enumerate_container_support<Container> =1>
+         enumerate_container_support<Container>>
 inline
 auto
 enumerate(Container &&container)
@@ -98,7 +98,7 @@ enumerate(Container &&container)
 }
 
 template<typename Container,
-         enumerate_container_support<Container> =1>
+         enumerate_container_support<Container>>
 inline
 auto
 cenumerate(const Container &container)
@@ -107,7 +107,7 @@ cenumerate(const Container &container)
 }
 
 template<typename Counter,
-         enumerate_counter_support<Counter> =1>
+         enumerate_counter_support<Counter>>
 inline
 auto
 enumerate(Counter from_count,
@@ -131,7 +131,7 @@ enumerate(Counter from_count,
 }
 
 template<typename Counter,
-         enumerate_counter_support<Counter> =1>
+         enumerate_counter_support<Counter>>
 inline
 auto
 enumerate(Counter to_count)
