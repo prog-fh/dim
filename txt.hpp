@@ -117,7 +117,7 @@ read_line();
 #endif // DIM_TXT_HPP
 
 //----------------------------------------------------------------------------
-// inline implementation details (don't look below!)
+// implementation details (don't look below!)
 //----------------------------------------------------------------------------
 
 #ifndef DIM_TXT_HPP_IMPL
@@ -795,7 +795,6 @@ extract_arg_(const char *&input,
 struct variadic_pass_
 {
   template<typename ...T>
-  inline
   variadic_pass_(T...)
   {
   }

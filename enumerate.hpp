@@ -52,7 +52,7 @@ enumerate(Counter to_count);
 #endif // DIM_ENUMERATE_HPP
 
 //----------------------------------------------------------------------------
-// inline implementation details (don't look below!)
+// implementation details (don't look below!)
 //----------------------------------------------------------------------------
 
 #ifndef DIM_ENUMERATE_HPP_IMPL

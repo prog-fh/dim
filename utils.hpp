@@ -18,7 +18,7 @@ system_time();
 #endif // DIM_UTILS_HPP
 
 //----------------------------------------------------------------------------
-// inline implementation details (don't look below!)
+// implementation details (don't look below!)
 //----------------------------------------------------------------------------
 
 #ifndef DIM_UTILS_HPP_IMPL

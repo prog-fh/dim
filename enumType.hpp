@@ -150,7 +150,7 @@ private:
 #endif // DIM_ENUMTYPE_HPP
 
 //----------------------------------------------------------------------------
-// inline implementation details (don't look below!)
+// implementation details (don't look below!)
 //----------------------------------------------------------------------------
 
 #ifndef DIM_ENUMTYPE_HPP_IMPL
