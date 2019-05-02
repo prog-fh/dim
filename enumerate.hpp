@@ -32,7 +32,7 @@ cenumerate(const Container &container);
 
 template<typename Counter>
 using enumerate_counter_support =
-  decltype(std::declval<Counter>()!=std::declval<Counter>(),
+  decltype((std::declval<Counter>()!=std::declval<Counter>()),
            ++std::declval<std::add_lvalue_reference_t<Counter>>(),
            1);
 
