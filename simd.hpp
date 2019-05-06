@@ -12,81 +12,6 @@
 
 namespace dim::simd {
 
-//~~~~ main types and traits ~~~~
-
-template<typename T>
-struct simd_helper { using flag = std::false_type; };
-
-template<typename T>
-constexpr auto is_simd_v = simd_helper<
-  typename std::decay<T>::type>::flag::value;
-
-template<typename T>
-using mask_t = typename simd_helper<
-  typename std::decay<T>::type>::mask_type;
-
-template<typename T>
-using value_t = typename simd_helper<
-  typename std::decay<T>::type>::value_type;
-
-template<typename T>
-constexpr auto vector_size_v = simd_helper<
-  typename std::decay<T>::type>::vector_size::value;
-
-template<typename T>
-constexpr auto value_size_v = simd_helper<
-  typename std::decay<T>::type>::value_size::value;
-
-template<typename T>
-constexpr auto value_count_v = simd_helper<
-  typename std::decay<T>::type>::value_count::value;
-
-template<typename T>
-using expect_simd =
-  typename std::enable_if<
-    is_simd_v<T>
-  >::type;
-
-template<typename T,
-         typename ValueType>
-using expect_value_type =
-  typename std::enable_if<
-    std::is_same<
-      value_t<T>,
-      typename std::decay<ValueType>::type
-      >::value
-    >::type;
-
-template<typename T,
-         int VectorSize>
-using expect_vector_size =
-  typename std::enable_if<
-    std::is_same<
-      typename simd_helper<typename std::decay<T>::type>::vector_size,
-      typename std::integral_constant<int, VectorSize>
-      >::value
-    >::type;
-
-template<typename T,
-         int ValueSize>
-using expect_value_size =
-  typename std::enable_if<
-    std::is_same<
-      typename simd_helper<typename std::decay<T>::type>::value_size,
-      typename std::integral_constant<int, ValueSize>
-      >::value
-    >::type;
-
-template<typename T,
-         int ValueCount>
-using expect_value_count =
-  typename std::enable_if<
-    std::is_same<
-      typename simd_helper<typename std::decay<T>::type>::value_count,
-      typename std::integral_constant<int, ValueCount>
-      >::value
-    >::type;
-
 template<typename ValueType,
          int VectorSize>
 struct vector_helper { using type = void; };
@@ -96,28 +21,132 @@ template<typename ValueType,
 using vector_t = typename vector_helper<
   typename std::decay<ValueType>::type, VectorSize>::type;
 
+template<typename T>
+class Simd
+{
+public:
+
+  using vector_type = T;
+  using value_type =
+    typename std::decay<decltype(std::declval<vector_type>()[0])>::type;
+
+  static constexpr auto vector_size =
+    int(sizeof(vector_type));
+  static constexpr auto value_size =
+    int(sizeof(value_type));
+  static constexpr auto value_count =
+    vector_size/value_size;
+  static constexpr auto is_integral =
+    std::is_integral<value_type>::value;
+  static constexpr auto is_floating_point =
+    std::is_floating_point<value_type>::value;
+
+  using mask_type = vector_t<
+    typename std::conditional<value_size==1, std::int8_t,
+    typename std::conditional<value_size==2, std::int16_t,
+    typename std::conditional<value_size==4, std::int32_t,
+    typename std::conditional<value_size==8, std::int64_t,
+    void>::type>::type>::type>::type, vector_size>;
+
+  constexpr Simd() : v_{} {};
+  constexpr Simd(vector_type v) : v_{v} {};
+  constexpr Simd & operator=(vector_type v) { v_=v; return *this; }
+  constexpr Simd(value_type v)
+  { // skip member-initialiser-list
+    constexpr auto c=value_count;
+    if constexpr (c==64)
+    {
+      v_=vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
+    }
+    else if constexpr (c==32)
+    {
+      v_=vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
+    }
+    else if constexpr (c==16)
+    {
+      v_=vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
+    }
+    else if constexpr (c==8)
+    {
+      v_=vector_type{v, v, v, v, v, v, v, v};
+    }
+    else if constexpr (c==4)
+    {
+      v_=vector_type{v, v, v, v};
+    }
+    else if constexpr (c==2)
+    {
+      v_=vector_type{v, v};
+    }
+    else
+    {
+      v_=vector_type{v};
+    }
+  }
+  constexpr Simd & operator=(value_type v) { v_=Simd{v}; return *this; }
+
+  constexpr Simd(const Simd &) =default;
+  constexpr Simd & operator=(const Simd &) =default;
+  constexpr Simd(Simd &&) =default;
+  constexpr Simd & operator=(Simd &&) =default;
+  ~Simd() =default;
+
+  constexpr operator    vector_type() const { return v_; }
+  constexpr const vector_type & vec() const { return v_; }
+  constexpr       vector_type & vec()       { return v_; }
+
+  constexpr value_type   operator[](int i) const { return v_[i]; }
+  constexpr value_type & operator[](int i)       { return v_[i]; }
+
+private:
+  vector_type v_;
+};
+
+template<typename T,
+         typename ValueType>
+using expect_value_type =
+  typename std::enable_if<
+    std::is_same<
+      typename T::value_type,
+      typename std::decay<ValueType>::type
+      >::value
+    >::type;
+
+template<typename T,
+         int VectorSize>
+using expect_vector_size =
+  typename std::enable_if<
+    std::is_same<
+      typename std::integral_constant<int, T::vector_size>,
+      typename std::integral_constant<int, VectorSize>
+      >::value
+    >::type;
+
+template<typename T,
+         int ValueSize>
+using expect_value_size =
+  typename std::enable_if<
+    std::is_same<
+      typename std::integral_constant<int, T::value_size>,
+      typename std::integral_constant<int, ValueSize>
+      >::value
+    >::type;
+
+template<typename T,
+         int ValueCount>
+using expect_value_count =
+  typename std::enable_if<
+    std::is_same<
+      typename std::integral_constant<int, T::value_count>,
+      typename std::integral_constant<int, ValueCount>
+      >::value
+    >::type;
+
 //~~~~ enumerate available simd types ~~~~
-
-#if defined __clang__
-# define DIM_SIMD_VECTOR_ATTR(vs, b) ext_vector_type(vs/sizeof(b))
-#elif defined __GNUC__
-# define DIM_SIMD_VECTOR_ATTR(vs, b) __vector_size__(vs)
-#else
-# error "SIMD vector types not supported by compiler"
-#endif
-
-#define DIM_SIMD_DEFINE_TYPE(vec, base, vec_size, mask) \
-  using vec = base __attribute__((DIM_SIMD_VECTOR_ATTR(vec_size, base))); \
-  template<> struct simd_helper<vec> \
-  { \
-    using flag = std::true_type; \
-    using mask_type = mask; \
-    using value_type = base; \
-    using vector_size = std::integral_constant<int, vec_size>; \
-    using value_size = std::integral_constant<int, sizeof(base)>; \
-    using value_count = std::integral_constant<int, vec_size/sizeof(base)>; \
-  }; \
-  template<> struct vector_helper<base, vec_size> { using type = vec; };
 
 #if __AVX512F__
 # define DIM_SIMD_MAX_VECTOR_SIZE 64
@@ -129,47 +158,50 @@ using vector_t = typename vector_helper<
 
 constexpr auto max_vector_size=DIM_SIMD_MAX_VECTOR_SIZE;
 
+#define DIM_SIMD_DEFINE_TYPE(vec, base, vec_size) \
+  using vec = Simd<base __attribute__((__vector_size__(vec_size)))>; \
+  template<> struct vector_helper<base, vec_size> { using type = vec; };
+
 #if DIM_SIMD_MAX_VECTOR_SIZE>=64
-  DIM_SIMD_DEFINE_TYPE(  u8x64_t,  std::uint8_t, 64,  u8x64_t)
-  DIM_SIMD_DEFINE_TYPE(  i8x64_t,   std::int8_t, 64,  u8x64_t)
-  DIM_SIMD_DEFINE_TYPE( u16x32_t, std::uint16_t, 64, u16x32_t)
-  DIM_SIMD_DEFINE_TYPE( i16x32_t,  std::int16_t, 64, u16x32_t)
-  DIM_SIMD_DEFINE_TYPE( u32x16_t, std::uint32_t, 64, u32x16_t)
-  DIM_SIMD_DEFINE_TYPE( i32x16_t,  std::int32_t, 64, u32x16_t)
-  DIM_SIMD_DEFINE_TYPE(  u64x8_t, std::uint64_t, 64,  u64x8_t)
-  DIM_SIMD_DEFINE_TYPE(  i64x8_t,  std::int64_t, 64,  u64x8_t)
-  DIM_SIMD_DEFINE_TYPE( r32x16_t,         float, 64, u32x16_t)
-  DIM_SIMD_DEFINE_TYPE(  r64x8_t,        double, 64,  u64x8_t)
+  DIM_SIMD_DEFINE_TYPE( u8x64_t,  std::uint8_t, 64)
+  DIM_SIMD_DEFINE_TYPE( i8x64_t,   std::int8_t, 64)
+  DIM_SIMD_DEFINE_TYPE(u16x32_t, std::uint16_t, 64)
+  DIM_SIMD_DEFINE_TYPE(i16x32_t,  std::int16_t, 64)
+  DIM_SIMD_DEFINE_TYPE(u32x16_t, std::uint32_t, 64)
+  DIM_SIMD_DEFINE_TYPE(i32x16_t,  std::int32_t, 64)
+  DIM_SIMD_DEFINE_TYPE( u64x8_t, std::uint64_t, 64)
+  DIM_SIMD_DEFINE_TYPE( i64x8_t,  std::int64_t, 64)
+  DIM_SIMD_DEFINE_TYPE(r32x16_t,         float, 64)
+  DIM_SIMD_DEFINE_TYPE( r64x8_t,        double, 64)
 #endif
 
 #if DIM_SIMD_MAX_VECTOR_SIZE>=32
-  DIM_SIMD_DEFINE_TYPE( u8x32_t,  std::uint8_t, 32,  u8x32_t)
-  DIM_SIMD_DEFINE_TYPE( i8x32_t,   std::int8_t, 32,  u8x32_t)
-  DIM_SIMD_DEFINE_TYPE(u16x16_t, std::uint16_t, 32, u16x16_t)
-  DIM_SIMD_DEFINE_TYPE(i16x16_t,  std::int16_t, 32, u16x16_t)
-  DIM_SIMD_DEFINE_TYPE( u32x8_t, std::uint32_t, 32,  u32x8_t)
-  DIM_SIMD_DEFINE_TYPE( i32x8_t,  std::int32_t, 32,  u32x8_t)
-  DIM_SIMD_DEFINE_TYPE( u64x4_t, std::uint64_t, 32,  u64x4_t)
-  DIM_SIMD_DEFINE_TYPE( i64x4_t,  std::int64_t, 32,  u64x4_t)
-  DIM_SIMD_DEFINE_TYPE( r32x8_t,         float, 32,  u32x8_t)
-  DIM_SIMD_DEFINE_TYPE( r64x4_t,        double, 32,  u64x4_t)
+  DIM_SIMD_DEFINE_TYPE( u8x32_t,  std::uint8_t, 32)
+  DIM_SIMD_DEFINE_TYPE( i8x32_t,   std::int8_t, 32)
+  DIM_SIMD_DEFINE_TYPE(u16x16_t, std::uint16_t, 32)
+  DIM_SIMD_DEFINE_TYPE(i16x16_t,  std::int16_t, 32)
+  DIM_SIMD_DEFINE_TYPE( u32x8_t, std::uint32_t, 32)
+  DIM_SIMD_DEFINE_TYPE( i32x8_t,  std::int32_t, 32)
+  DIM_SIMD_DEFINE_TYPE( u64x4_t, std::uint64_t, 32)
+  DIM_SIMD_DEFINE_TYPE( i64x4_t,  std::int64_t, 32)
+  DIM_SIMD_DEFINE_TYPE( r32x8_t,         float, 32)
+  DIM_SIMD_DEFINE_TYPE( r64x4_t,        double, 32)
 #endif
 
 #if DIM_SIMD_MAX_VECTOR_SIZE>=16
-  DIM_SIMD_DEFINE_TYPE(u8x16_t,  std::uint8_t, 16, u8x16_t)
-  DIM_SIMD_DEFINE_TYPE(i8x16_t,   std::int8_t, 16, u8x16_t)
-  DIM_SIMD_DEFINE_TYPE(u16x8_t, std::uint16_t, 16, u16x8_t)
-  DIM_SIMD_DEFINE_TYPE(i16x8_t,  std::int16_t, 16, u16x8_t)
-  DIM_SIMD_DEFINE_TYPE(u32x4_t, std::uint32_t, 16, u32x4_t)
-  DIM_SIMD_DEFINE_TYPE(i32x4_t,  std::int32_t, 16, u32x4_t)
-  DIM_SIMD_DEFINE_TYPE(u64x2_t, std::uint64_t, 16, u64x2_t)
-  DIM_SIMD_DEFINE_TYPE(i64x2_t,  std::int64_t, 16, u64x2_t)
-  DIM_SIMD_DEFINE_TYPE(r32x4_t,         float, 16, u32x4_t)
-  DIM_SIMD_DEFINE_TYPE(r64x2_t,        double, 16, u64x2_t)
+  DIM_SIMD_DEFINE_TYPE( u8x16_t,  std::uint8_t, 16)
+  DIM_SIMD_DEFINE_TYPE( i8x16_t,   std::int8_t, 16)
+  DIM_SIMD_DEFINE_TYPE( u16x8_t, std::uint16_t, 16)
+  DIM_SIMD_DEFINE_TYPE( i16x8_t,  std::int16_t, 16)
+  DIM_SIMD_DEFINE_TYPE( u32x4_t, std::uint32_t, 16)
+  DIM_SIMD_DEFINE_TYPE( i32x4_t,  std::int32_t, 16)
+  DIM_SIMD_DEFINE_TYPE( u64x2_t, std::uint64_t, 16)
+  DIM_SIMD_DEFINE_TYPE( i64x2_t,  std::int64_t, 16)
+  DIM_SIMD_DEFINE_TYPE( r32x4_t,         float, 16)
+  DIM_SIMD_DEFINE_TYPE( r64x2_t,        double, 16)
 #endif
 
 #undef DIM_SIMD_MAX_VECTOR_SIZE
-#undef DIM_SIMD_VECTOR_ATTR
 #undef DIM_SIMD_DEFINE_TYPE
 
 using u8_t  = vector_t< std::uint8_t, max_vector_size>;
@@ -183,413 +215,228 @@ using i64_t = vector_t< std::int64_t, max_vector_size>;
 using r32_t = vector_t<        float, max_vector_size>;
 using r64_t = vector_t<       double, max_vector_size>;
 
-//~~~~ properties ~~~~
+//~~~~ arithmetic and logic operators ~~~~
 
-template<typename T,
-         typename =expect_simd<T>>
+#define DIM_SIMD_FORWARD_UNARY(op) \
+        template<typename T> \
+        inline constexpr \
+        auto \
+        operator op(Simd<T> rhs) \
+        { \
+          return Simd{op rhs.vec()}; \
+        }
+DIM_SIMD_FORWARD_UNARY(+)
+DIM_SIMD_FORWARD_UNARY(-)
+DIM_SIMD_FORWARD_UNARY(~)
+#undef DIM_SIMD_FORWARD_UNARY
+#define DIM_SIMD_FORWARD_BINARY(op) \
+        template<typename T1, \
+                 typename T2> \
+        inline constexpr \
+        auto \
+        operator op(Simd<T1> lhs, \
+                    Simd<T2> rhs) \
+        { \
+          return Simd{lhs.vec() op rhs.vec()}; \
+        } \
+        template<typename T> \
+        inline constexpr \
+        auto \
+        operator op(Simd<T> lhs, \
+                    typename Simd<T>::value_type rhs) \
+        { \
+          return Simd{lhs.vec() op rhs}; \
+        } \
+        template<typename T> \
+        inline constexpr \
+        auto \
+        operator op(typename Simd<T>::value_type lhs, \
+                    Simd<T> rhs) \
+        { \
+          return Simd{lhs op rhs.vec()}; \
+        }
+#define DIM_SIMD_FORWARD_BINARY_ASSIGN(op) \
+        DIM_SIMD_FORWARD_BINARY(op) \
+        template<typename T1, \
+                 typename T2> \
+        inline constexpr \
+        auto & \
+        operator op##=(Simd<T1> &lhs, \
+                       Simd<T2> rhs) \
+        { \
+          lhs.vec() op##= rhs.vec(); \
+          return lhs; \
+        } \
+        template<typename T> \
+        inline constexpr \
+        auto & \
+        operator op##=(Simd<T> &lhs, \
+                       typename Simd<T>::value_type rhs) \
+        { \
+          lhs.vec() op##= rhs; \
+          return lhs; \
+        }
+DIM_SIMD_FORWARD_BINARY_ASSIGN(+)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(-)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(*)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(/)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(%)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(&)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(|)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(^)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(<<)
+DIM_SIMD_FORWARD_BINARY_ASSIGN(>>)
+#undef DIM_SIMD_FORWARD_BINARY_ASSIGN
+DIM_SIMD_FORWARD_BINARY(==)
+DIM_SIMD_FORWARD_BINARY(!=)
+DIM_SIMD_FORWARD_BINARY(<)
+DIM_SIMD_FORWARD_BINARY(<=)
+DIM_SIMD_FORWARD_BINARY(>)
+DIM_SIMD_FORWARD_BINARY(>=)
+DIM_SIMD_FORWARD_BINARY(&&)
+DIM_SIMD_FORWARD_BINARY(||)
+#undef DIM_SIMD_FORWARD_BINARY
+
+//~~~~ selection ~~~~
+
+template<typename T1,
+         typename T2>
 inline constexpr
-int
-vector_size(T v)
+auto
+select(Simd<T1> condition,
+       Simd<T2> true_value,
+       Simd<T2> false_value)
 {
-  return vector_size_v<decltype(v)>;
+  using mask_t=typename Simd<T2>::mask_type::vector_type;
+  const auto t_mask=reinterpret_cast<mask_t>(true_value.vec());
+  const auto f_mask=reinterpret_cast<mask_t>(false_value.vec());
+  const auto result=(t_mask&condition.vec())|(f_mask&~condition.vec());
+  return Simd{reinterpret_cast<typename Simd<T2>::vector_type>(result)};
 }
 
-template<typename T,
-         typename =expect_simd<T>>
+template<typename T>
 inline constexpr
-int
-value_size(T v)
+auto
+min(Simd<T> a,
+    Simd<T> b)
 {
-  return value_size_v<decltype(v)>;
+  return select(a<b, a , b);
 }
 
-template<typename T,
-         typename =expect_simd<T>>
+template<typename T>
 inline constexpr
-int
-value_count(T v)
+auto
+max(Simd<T> a,
+    Simd<T> b)
 {
-  return value_count_v<decltype(v)>;
+  return select(a>b, a , b);
 }
 
-template<typename T,
-         typename =expect_simd<T>>
-inline
-std::string
-to_string(T v)
-{
-  auto r=std::string{"{ "};
-  for(int i=0; i<value_count(v); ++i)
-  {
-    if(i!=0)
-    {
-      r+=", ";
-    }
-    r+=std::to_string(v[i]);
-  }
-  r+=" }";
-  return r;
-}
+//~~~~ explicit initialisation ~~~~
 
-//~~~~ load/store ~~~~
+#define DIM_SIMD_X64(x) \
+        x##0,  x##1,  x##2,  x##3,  x##4,  x##5,  x##6,  x##7,  \
+        x##8,  x##9,  x##10, x##11, x##12, x##13, x##14, x##15, \
+        x##16, x##17, x##18, x##19, x##20, x##21, x##22, x##23, \
+        x##24, x##25, x##26, x##27, x##28, x##29, x##30, x##31, \
+        x##32, x##33, x##34, x##35, x##36, x##37, x##38, x##39, \
+        x##40, x##41, x##42, x##43, x##44, x##45, x##46, x##47, \
+        x##48, x##49, x##50, x##51, x##52, x##53, x##54, x##55, \
+        x##56, x##57, x##58, x##59, x##60, x##61, x##62, x##63
+#define DIM_SIMD_X32(x) \
+        x##0,  x##1,  x##2,  x##3,  x##4,  x##5,  x##6,  x##7,  \
+        x##8,  x##9,  x##10, x##11, x##12, x##13, x##14, x##15, \
+        x##16, x##17, x##18, x##19, x##20, x##21, x##22, x##23, \
+        x##24, x##25, x##26, x##27, x##28, x##29, x##30, x##31
+#define DIM_SIMD_X16(x) \
+        x##0,  x##1,  x##2,  x##3,  x##4,  x##5,  x##6,  x##7,  \
+        x##8,  x##9,  x##10, x##11, x##12, x##13, x##14, x##15
+#define DIM_SIMD_X8(x) \
+        x##0,  x##1,  x##2,  x##3,  x##4,  x##5,  x##6,  x##7
+#define DIM_SIMD_X4(x) \
+        x##0,  x##1,  x##2,  x##3
+#define DIM_SIMD_X2(x) \
+        x##0,  x##1
 
-template<typename T,
-         typename =expect_simd<T>>
-inline
-T
-load_u(const T *unaligned_addr)
-{
-  struct unaligned { T v; } __attribute__((__packed__));
-  return reinterpret_cast<const unaligned *>(unaligned_addr)->v;
-}
-
-template<typename T,
-         typename =expect_simd<T>>
-inline
-T
-load_a(const T *aligned_addr)
-{
-  return *aligned_addr;
-}
-
-template<typename T,
-         typename =expect_simd<T>>
-inline
-void
-store_u(T *unaligned_addr,
-        T v)
-{
-  struct unaligned { T v; } __attribute__((__packed__));
-  reinterpret_cast<unaligned *>(unaligned_addr)->v=v;
-}
-
-template<typename T,
-         typename =expect_simd<T>>
-inline
-void
-store_a(T *aligned_addr,
-        T v)
-{
-  *aligned_addr=v;
-}
-
-//~~~~ fill ~~~~
-
-template<typename T,
-         typename =expect_simd<T>>
-inline constexpr
-T
-zero()
-{
-  return T{0};
-}
-
-template<typename T,
-         typename =expect_simd<T>>
-inline constexpr
-T
-fill(value_t<T> v)
-{
-  constexpr auto c=value_count_v<T>;
-  if constexpr (c==64)
-  {
-    return T{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-             v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-             v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-             v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
-  }
-  else if constexpr (c==32)
-  {
-    return T{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-             v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
-  }
-  else if constexpr (c==16)
-  {
-    return T{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
-  }
-  else if constexpr (c==8)
-  {
-    return T{v, v, v, v, v, v, v, v};
-  }
-  else if constexpr (c==4)
-  {
-    return T{v, v, v, v};
-  }
-  else if constexpr (c==2)
-  {
-    return T{v, v};
-  }
-  else
-  {
-    return v;
-  }
-}
-
-//~~~~ min/max ~~~~
-
-template<typename T,
-         typename =expect_simd<T>>
-inline constexpr
-T
-min(T a,
-    T b)
-{
-  const auto cmp=a<b;
-  return (a&cmp)|(b&~cmp);
-}
-
-template<typename T,
-         typename =expect_simd<T>>
-inline constexpr
-T
-max(T a,
-    T b)
-{
-  const auto cmp=a>b;
-  return (a&cmp)|(b&~cmp);
-}
+#define DIM_SIMD_MAKE(count) \
+        template<typename T, \
+                 typename =expect_value_count<T, count>> \
+        inline constexpr \
+        auto \
+        make(DIM_SIMD_X##count(typename T::value_type arg)) \
+        { \
+          return Simd{typename T::vector_type{DIM_SIMD_X##count(arg)}}; \
+        }
+DIM_SIMD_MAKE(64)
+DIM_SIMD_MAKE(32)
+DIM_SIMD_MAKE(16)
+DIM_SIMD_MAKE(8)
+DIM_SIMD_MAKE(4)
+DIM_SIMD_MAKE(2)
+#undef DIM_SIMD_MAKE
 
 //~~~~ shuffle ~~~~
 
 #if defined __clang__
-# define DIM_SIMD_SHUFFLE_1(mask) \
-         __builtin_shufflevector(v, v, mask)
-# define DIM_SIMD_SHUFFLE_2(mask) \
-         __builtin_shufflevector(low, high, mask)
-#else
-# define DIM_SIMD_SHUFFLE_1(mask) \
-         __builtin_shuffle(v, mask_t<T>{mask})
-# define DIM_SIMD_SHUFFLE_2(mask) \
-         __builtin_shuffle(low, high, mask_t<T>{mask})
+# define DIM_SIMD_BUILTIN_SHUFFLE_1(mask) \
+         __builtin_shufflevector(v.vec(), v.vec(), mask)
+# define DIM_SIMD_BUILTIN_SHUFFLE_2(mask) \
+         __builtin_shufflevector(low.vec(), high.vec(), mask)
+#else // GCC
+# define DIM_SIMD_BUILTIN_SHUFFLE_1(mask) \
+         __builtin_shuffle(v.vec(), \
+                           typename T::mask_type::vector_type{mask})
+# define DIM_SIMD_BUILTIN_SHUFFLE_2(mask) \
+         __builtin_shuffle(low.vec(), high.vec(), \
+                           typename T::mask_type::vector_type{mask})
 #endif
-
-#define DIM_SIMD_MASK_64  N0,  N1,  N2,  N3,  N4,  N5,  N6,  N7, \
-                          N8,  N9, N10, N11, N12, N13, N14, N15, \
-                         N16, N17, N18, N19, N20, N21, N22, N23, \
-                         N24, N25, N26, N27, N28, N29, N30, N31, \
-                         N32, N33, N34, N35, N36, N37, N38, N39, \
-                         N40, N41, N42, N43, N44, N45, N46, N47, \
-                         N48, N49, N50, N51, N52, N53, N54, N55, \
-                         N56, N57, N58, N59, N60, N61, N62, N63
-#define DIM_SIMD_MASK_32  N0,  N1,  N2,  N3,  N4,  N5,  N6,  N7, \
-                          N8,  N9, N10, N11, N12, N13, N14, N15, \
-                         N16, N17, N18, N19, N20, N21, N22, N23, \
-                         N24, N25, N26, N27, N28, N29, N30, N31
-#define DIM_SIMD_MASK_16  N0,  N1,  N2,  N3,  N4,  N5,  N6,  N7, \
-                          N8,  N9, N10, N11, N12, N13, N14, N15
-#define DIM_SIMD_MASK_8   N0,  N1,  N2,  N3,  N4,  N5,  N6,  N7
-#define DIM_SIMD_MASK_4   N0,  N1,  N2,  N3
-#define DIM_SIMD_MASK_2   N0,  N1
 
 using idx_t = std::uint8_t;
 
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         idx_t  N8, idx_t  N9, idx_t N10, idx_t N11,
-         idx_t N12, idx_t N13, idx_t N14, idx_t N15,
-         idx_t N16, idx_t N17, idx_t N18, idx_t N19,
-         idx_t N20, idx_t N21, idx_t N22, idx_t N23,
-         idx_t N24, idx_t N25, idx_t N26, idx_t N27,
-         idx_t N28, idx_t N29, idx_t N30, idx_t N31,
-         idx_t N32, idx_t N33, idx_t N34, idx_t N35,
-         idx_t N36, idx_t N37, idx_t N38, idx_t N39,
-         idx_t N40, idx_t N41, idx_t N42, idx_t N43,
-         idx_t N44, idx_t N45, idx_t N46, idx_t N47,
-         idx_t N48, idx_t N49, idx_t N50, idx_t N51,
-         idx_t N52, idx_t N53, idx_t N54, idx_t N55,
-         idx_t N56, idx_t N57, idx_t N58, idx_t N59,
-         idx_t N60, idx_t N61, idx_t N62, idx_t N63,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 64>>
-inline constexpr
-T
-shuffle(T v)
-{
-  return DIM_SIMD_SHUFFLE_1(DIM_SIMD_MASK_64);
-}
+#define DIM_SIMD_SHUFFLE(count) \
+        template<DIM_SIMD_X##count(idx_t N), \
+                 typename T, \
+                 typename =expect_value_count<T, count>> \
+        inline constexpr \
+        auto \
+        shuffle(T v) \
+        { \
+          return Simd{DIM_SIMD_BUILTIN_SHUFFLE_1(DIM_SIMD_X##count(N))}; \
+        } \
+        template<DIM_SIMD_X##count(idx_t N), \
+                 typename T, \
+                 typename =expect_value_count<T, count>> \
+        inline constexpr \
+        auto \
+        shuffle(T low, \
+                T high) \
+        { \
+          return Simd{DIM_SIMD_BUILTIN_SHUFFLE_2(DIM_SIMD_X##count(N))}; \
+        }
+DIM_SIMD_SHUFFLE(64)
+DIM_SIMD_SHUFFLE(32)
+DIM_SIMD_SHUFFLE(16)
+DIM_SIMD_SHUFFLE(8)
+DIM_SIMD_SHUFFLE(4)
+DIM_SIMD_SHUFFLE(2)
+#undef DIM_SIMD_SHUFFLE
+#undef DIM_SIMD_BUILTIN_SHUFFLE_1
+#undef DIM_SIMD_BUILTIN_SHUFFLE_2
 
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         idx_t  N8, idx_t  N9, idx_t N10, idx_t N11,
-         idx_t N12, idx_t N13, idx_t N14, idx_t N15,
-         idx_t N16, idx_t N17, idx_t N18, idx_t N19,
-         idx_t N20, idx_t N21, idx_t N22, idx_t N23,
-         idx_t N24, idx_t N25, idx_t N26, idx_t N27,
-         idx_t N28, idx_t N29, idx_t N30, idx_t N31,
-         idx_t N32, idx_t N33, idx_t N34, idx_t N35,
-         idx_t N36, idx_t N37, idx_t N38, idx_t N39,
-         idx_t N40, idx_t N41, idx_t N42, idx_t N43,
-         idx_t N44, idx_t N45, idx_t N46, idx_t N47,
-         idx_t N48, idx_t N49, idx_t N50, idx_t N51,
-         idx_t N52, idx_t N53, idx_t N54, idx_t N55,
-         idx_t N56, idx_t N57, idx_t N58, idx_t N59,
-         idx_t N60, idx_t N61, idx_t N62, idx_t N63,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 64>>
-inline constexpr
-T
-shuffle(T low,
-        T high)
-{
-  return DIM_SIMD_SHUFFLE_2(DIM_SIMD_MASK_64);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         idx_t  N8, idx_t  N9, idx_t N10, idx_t N11,
-         idx_t N12, idx_t N13, idx_t N14, idx_t N15,
-         idx_t N16, idx_t N17, idx_t N18, idx_t N19,
-         idx_t N20, idx_t N21, idx_t N22, idx_t N23,
-         idx_t N24, idx_t N25, idx_t N26, idx_t N27,
-         idx_t N28, idx_t N29, idx_t N30, idx_t N31,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 32>>
-inline constexpr
-T
-shuffle(T v)
-{
-  return DIM_SIMD_SHUFFLE_1(DIM_SIMD_MASK_32);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         idx_t  N8, idx_t  N9, idx_t N10, idx_t N11,
-         idx_t N12, idx_t N13, idx_t N14, idx_t N15,
-         idx_t N16, idx_t N17, idx_t N18, idx_t N19,
-         idx_t N20, idx_t N21, idx_t N22, idx_t N23,
-         idx_t N24, idx_t N25, idx_t N26, idx_t N27,
-         idx_t N28, idx_t N29, idx_t N30, idx_t N31,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 32>>
-inline constexpr
-T
-shuffle(T low,
-        T high)
-{
-  return DIM_SIMD_SHUFFLE_2(DIM_SIMD_MASK_32);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         idx_t  N8, idx_t  N9, idx_t N10, idx_t N11,
-         idx_t N12, idx_t N13, idx_t N14, idx_t N15,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 16>>
-inline constexpr
-T
-shuffle(T v)
-{
-  return DIM_SIMD_SHUFFLE_1(DIM_SIMD_MASK_16);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         idx_t  N8, idx_t  N9, idx_t N10, idx_t N11,
-         idx_t N12, idx_t N13, idx_t N14, idx_t N15,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 16>>
-inline constexpr
-T
-shuffle(T low,
-        T high)
-{
-  return DIM_SIMD_SHUFFLE_2(DIM_SIMD_MASK_16);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 8>>
-inline constexpr
-T
-shuffle(T v)
-{
-  return DIM_SIMD_SHUFFLE_1(DIM_SIMD_MASK_8);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         idx_t  N4, idx_t  N5, idx_t  N6, idx_t  N7,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 8>>
-inline constexpr
-T
-shuffle(T low,
-        T high)
-{
-  return DIM_SIMD_SHUFFLE_2(DIM_SIMD_MASK_8);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 4>>
-inline constexpr
-T
-shuffle(T v)
-{
-  return DIM_SIMD_SHUFFLE_1(DIM_SIMD_MASK_4);
-}
-
-template<idx_t  N0, idx_t  N1, idx_t  N2, idx_t  N3,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 4>>
-inline constexpr
-T
-shuffle(T low,
-        T high)
-{
-  return DIM_SIMD_SHUFFLE_2(DIM_SIMD_MASK_4);
-}
-
-template<idx_t  N0, idx_t  N1,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 2>>
-inline constexpr
-T
-shuffle(T v)
-{
-  return DIM_SIMD_SHUFFLE_1(DIM_SIMD_MASK_2);
-}
-
-template<idx_t  N0, idx_t  N1,
-         typename T,
-         typename =expect_simd<T>,
-         typename =expect_value_count<T, 2>>
-inline constexpr
-T
-shuffle(T low,
-        T high)
-{
-  return DIM_SIMD_SHUFFLE_2(DIM_SIMD_MASK_2);
-}
-
-#undef DIM_SIMD_SHUFFLE_1
-#undef DIM_SIMD_SHUFFLE_2
-#undef DIM_SIMD_MASK_64
-#undef DIM_SIMD_MASK_32
-#undef DIM_SIMD_MASK_16
-#undef DIM_SIMD_MASK_8
-#undef DIM_SIMD_MASK_4
-#undef DIM_SIMD_MASK_2
+#undef DIM_SIMD_X64
+#undef DIM_SIMD_X32
+#undef DIM_SIMD_X16
+#undef DIM_SIMD_X8
+#undef DIM_SIMD_X4
+#undef DIM_SIMD_X2
 
 template<idx_t N,
-         typename T,
-         typename =expect_simd<T>>
+         typename T>
 inline constexpr
-T
-down(T v)
+auto
+down(Simd<T> v)
 {
-  constexpr auto c=value_count_v<T>;
+  constexpr auto c=v.value_count;
   if constexpr (c==64)
   {
     return shuffle<( 0+N)%c, ( 1+N)%c, ( 2+N)%c, ( 3+N)%c,
@@ -647,24 +494,22 @@ down(T v)
 }
 
 template<idx_t N,
-         typename T,
-         typename =expect_simd<T>>
+         typename T>
 inline constexpr
-T
-up(T v)
+auto
+up(Simd<T> v)
 {
-  constexpr auto c=value_count_v<T>;
+  constexpr auto c=v.value_count;
   return down<c-N>(v);
 }
 
-template<typename T,
-         typename =expect_simd<T>>
+template<typename T>
 inline constexpr
-T
-even(T low,
-     T high)
+auto
+even(Simd<T> low,
+     Simd<T> high)
 {
-  constexpr auto c=value_count_v<T>;
+  constexpr auto c=low.value_count;
   if constexpr (c==64)
   {
     return shuffle<  0,   2,   4,   6,   8,  10,  12,  14,
@@ -706,14 +551,13 @@ even(T low,
   }
 }
 
-template<typename T,
-         typename =expect_simd<T>>
+template<typename T>
 inline constexpr
-T
-odd(T low,
-    T high)
+auto
+odd(Simd<T> low,
+    Simd<T> high)
 {
-  constexpr auto c=value_count_v<T>;
+  constexpr auto c=low.value_count;
   if constexpr (c==64)
   {
     return shuffle<  1,   3,   5,   7,   9,  11,  13,  15,
@@ -755,41 +599,157 @@ odd(T low,
   }
 }
 
-template<typename VectorType,
-         typename ValueType,
-         typename =expect_value_type<VectorType, ValueType>>
-std::tuple<int, // prefix
-           int, // vector_count
-           int> // suffix
-split(const ValueType *values,
+//~~~~ load/store ~~~~
+
+template<typename T>
+inline
+auto
+load_u(const Simd<T> *unaligned_addr)
+{
+  using vec_t = typename Simd<T>::vector_type;
+  struct unaligned { vec_t v; } __attribute__((__packed__));
+  return Simd{reinterpret_cast<const unaligned *>(unaligned_addr)->v};
+}
+
+template<typename T>
+inline
+auto
+load_a(const Simd<T> *aligned_addr)
+{
+  return *aligned_addr;
+}
+
+template<typename T>
+inline
+void
+store_u(Simd<T> *unaligned_addr,
+        Simd<T> v)
+{
+  using vec_t = typename Simd<T>::vector_type;
+  struct unaligned { vec_t v; } __attribute__((__packed__));
+  reinterpret_cast<unaligned *>(unaligned_addr)->v=v.vec();
+}
+
+template<typename T>
+inline
+void
+store_a(Simd<T> *aligned_addr,
+        Simd<T> v)
+{
+  *aligned_addr=v;
+}
+
+template<typename T>
+inline
+auto
+split(const typename T::value_type *values,
       int count)
 {
-  constexpr auto vector_size=vector_size_v<VectorType>;
-  constexpr auto value_size=value_size_v<VectorType>;
-  constexpr auto value_count=value_count_v<VectorType>;
+  constexpr auto vector_size=T::vector_size;
+  constexpr auto value_size=T::value_size;
+  constexpr auto value_count=T::value_count;
   const auto offset=int(reinterpret_cast<std::intptr_t>(values)%vector_size);
   const auto prefix=offset ? (vector_size-offset)/value_size : 0;
   const auto vector_count=(count-prefix)/value_count;
   const auto suffix=(count-prefix)%value_count;
-  return {prefix, vector_count, suffix};
+  return std::make_tuple(prefix, vector_count, suffix);
+}
+
+template<typename T>
+inline
+auto
+load_prefix(const typename T::value_type *values,
+            int prefix_length)
+{
+  auto v=T{};
+  const auto offset=v.value_count-prefix_length;
+  for(auto i=0; i<prefix_length; ++i)
+  {
+    v[i+offset]=values[i];
+  }
+  return v;
+}
+
+template<typename T>
+inline
+void
+store_prefix(typename T::value_type *values,
+             int prefix_length,
+             Simd<T> v)
+{
+  const auto offset=v.value_count-prefix_length;
+  for(auto i=0; i<prefix_length; ++i)
+  {
+    values[i]=v[i+offset];
+  }
+}
+
+template<typename T>
+inline
+auto
+load_suffix(const typename T::value_type *values,
+            int suffix_length)
+{
+  auto v=T{};
+  for(auto i=0; i<suffix_length; ++i)
+  {
+    v[i]=values[i];
+  }
+  return v;
+}
+
+template<typename T>
+inline
+void
+store_suffix(typename T::value_type *values,
+             int suffix_length,
+             Simd<T> v)
+{
+  for(auto i=0; i<suffix_length; ++i)
+  {
+    values[i]=v[i];
+  }
+}
+
+//~~~~ display operations ~~~~
+
+template<typename T>
+inline
+std::string
+to_string(const Simd<T> &v)
+{
+  auto result=std::string{'{'};
+  for(auto i=0; i<v.value_count; ++i)
+  {
+    if(i!=0)
+    {
+      result+=", ";
+    }
+    result+=std::to_string(v[i]);
+  }
+  result+='}';
+  return result;;
+}
+
+template<typename T>
+inline
+std::ostream &
+operator<<(std::ostream &os,
+           const Simd<T> &v)
+{
+  os << '{';
+  for(auto i=0; i<v.value_count; ++i)
+  {
+    if(i!=0)
+    {
+      os << ", ";
+    }
+    os << v[i];
+  }
+  return os << '}';
 }
 
 } // namespace dim::simd
-
-namespace std {
-// FIXME: ugly but convenient way to provide std::operator<< for simd types
-
-template<typename T,
-         typename =dim::simd::expect_simd<T>>
-inline
-ostream &
-operator<<(ostream &os,
-           const T &v)
-{
-  return os << dim::simd::to_string(v);
-}
-
-} // namespace std
 
 #endif // DIM_SIMD_HPP
 
