@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <tuple>
+#include <cmath>
 #include <string>
 #include <iostream>
 
@@ -221,12 +222,12 @@ DIM_SIMD_FORWARD_UNARY(-)
 DIM_SIMD_FORWARD_UNARY(~)
 #undef DIM_SIMD_FORWARD_UNARY
 #define DIM_SIMD_FORWARD_BINARY(op) \
-        template<typename VectorType1, \
-                 typename VectorType2> \
+        template<typename LhsVectorType, \
+                 typename RhsVectorType> \
         inline constexpr \
         auto \
-        operator op(Simd<VectorType1> lhs, \
-                    Simd<VectorType2> rhs) \
+        operator op(Simd<LhsVectorType> lhs, \
+                    Simd<RhsVectorType> rhs) \
         { \
           return Simd{lhs.vec() op rhs.vec()}; \
         } \
@@ -248,12 +249,12 @@ DIM_SIMD_FORWARD_UNARY(~)
         }
 #define DIM_SIMD_FORWARD_BINARY_ASSIGN(op) \
         DIM_SIMD_FORWARD_BINARY(op) \
-        template<typename VectorType1, \
-                 typename VectorType2> \
+        template<typename LhsVectorType, \
+                 typename RhsVectorType> \
         inline constexpr \
         auto & \
-        operator op##=(Simd<VectorType1> &lhs, \
-                       Simd<VectorType2> rhs) \
+        operator op##=(Simd<LhsVectorType> &lhs, \
+                       Simd<RhsVectorType> rhs) \
         { \
           lhs.vec() op##= rhs.vec(); \
           return lhs; \
@@ -698,18 +699,13 @@ load_prefix(const typename SimdType::value_type *values,
             int prefix_length)
 {
   using vector_t = typename SimdType::vector_type;
-  union
-  {
-    vector_t v;
-    typename SimdType::value_type a[SimdType::value_count];
-  } result;
-  result.v=vector_t{};
+  auto result=vector_t{};
   const auto offset=SimdType::value_count-prefix_length;
   for(auto i=0; i<prefix_length; ++i)
   {
-    result.a[i+offset]=values[i];
+    result[i+offset]=values[i];
   }
-  return Simd{result.v};
+  return Simd{result};
 }
 
 template<typename VectorType>
@@ -733,17 +729,12 @@ load_suffix(const typename SimdType::value_type *values,
             int suffix_length)
 {
   using vector_t = typename SimdType::vector_type;
-  union
-  {
-    vector_t v;
-    typename SimdType::value_type a[SimdType::value_count];
-  } result;
-  result.v=vector_t{};
+  auto result=vector_t{};
   for(auto i=0; i<suffix_length; ++i)
   {
-    result.a[i]=values[i];
+    result[i]=values[i];
   }
-  return Simd{result.v};
+  return Simd{result};
 }
 
 template<typename VectorType>
@@ -757,6 +748,25 @@ store_suffix(typename Simd<VectorType>::value_type *values,
   {
     values[i]=s[i];
   }
+}
+
+//~~~~ math functions ~~~~
+
+// FIXME: consider using intrinsics since a for loop over the vector
+// components is not always optimised as a single simd instruction
+// see: https://software.intel.com/sites/landingpage/IntrinsicsGuide/
+// in SVML: _mm_sqrt_ps, _mm_log_ps, _mm_pow_ps...
+
+template<typename VectorType>
+auto
+sqrt(Simd<VectorType> s)
+{
+  VectorType result;
+  for(auto i=0; i<s.value_count; ++i)
+  {
+    result[i]=std::sqrt(s[i]);
+  }
+  return Simd{result};
 }
 
 //~~~~ display operations ~~~~
