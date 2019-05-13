@@ -46,41 +46,43 @@ public:
   constexpr Simd(vector_type v) : v_{v} {};
   constexpr Simd & operator=(vector_type v) { v_=v; return *this; }
   constexpr Simd(value_type v)
-  { // skip member-initialiser-list
-    constexpr auto c=value_count;
-    if constexpr(c==64)
+  : v_{
+    [&v]()
     {
-      v_=vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
-    }
-    else if constexpr(c==32)
-    {
-      v_=vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
-                     v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
-    }
-    else if constexpr(c==16)
-    {
-      v_=vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
-    }
-    else if constexpr(c==8)
-    {
-      v_=vector_type{v, v, v, v, v, v, v, v};
-    }
-    else if constexpr(c==4)
-    {
-      v_=vector_type{v, v, v, v};
-    }
-    else if constexpr(c==2)
-    {
-      v_=vector_type{v, v};
-    }
-    else
-    {
-      v_=vector_type{v};
-    }
-  }
+      constexpr auto c=value_count;
+      if constexpr(c==64)
+      {
+        return vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                           v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                           v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                           v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
+      }
+      else if constexpr(c==32)
+      {
+        return vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v,
+                           v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
+      }
+      else if constexpr(c==16)
+      {
+        return vector_type{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v};
+      }
+      else if constexpr(c==8)
+      {
+        return vector_type{v, v, v, v, v, v, v, v};
+      }
+      else if constexpr(c==4)
+      {
+        return vector_type{v, v, v, v};
+      }
+      else if constexpr(c==2)
+      {
+        return vector_type{v, v};
+      }
+      else
+      {
+        return vector_type{v};
+      }
+    }()} {}
   constexpr Simd & operator=(value_type v) { v_=Simd{v}; return *this; }
 
   constexpr Simd(const Simd &) =default;
@@ -327,6 +329,24 @@ min(Simd<VectorType> a,
 template<typename VectorType>
 inline constexpr
 auto
+min(Simd<VectorType> a,
+    typename Simd<VectorType>::value_type b)
+{
+  return min(a, Simd<VectorType>{b});
+}
+
+template<typename VectorType>
+inline constexpr
+auto
+min(typename Simd<VectorType>::value_type a,
+    Simd<VectorType> b)
+{
+  return min(Simd<VectorType>{a}, b);
+}
+
+template<typename VectorType>
+inline constexpr
+auto
 max(Simd<VectorType> a,
     Simd<VectorType> b)
 {
@@ -335,6 +355,24 @@ max(Simd<VectorType> a,
 #else
   return Simd{a.vec()>b.vec() ? a.vec() : b.vec()};
 #endif
+}
+
+template<typename VectorType>
+inline constexpr
+auto
+max(Simd<VectorType> a,
+    typename Simd<VectorType>::value_type b)
+{
+  return max(a, Simd<VectorType>{b});
+}
+
+template<typename VectorType>
+inline constexpr
+auto
+max(typename Simd<VectorType>::value_type a,
+    Simd<VectorType> b)
+{
+  return max(Simd<VectorType>{a}, b);
 }
 
 //~~~~ explicit initialisation ~~~~
