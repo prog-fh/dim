@@ -794,6 +794,9 @@ store_suffix(typename Simd<VectorType>::value_type *values,
 // components is not always optimised as a single simd instruction
 // see: https://software.intel.com/sites/landingpage/IntrinsicsGuide/
 // in SVML: _mm_sqrt_ps, _mm_log_ps, _mm_pow_ps...
+//
+// https://stackoverflow.com/questions/31978592/c-error-mm-sin-ps-was-not-declared-in-this-scope
+// --> mentions libmvec
 
 template<typename VectorType>
 auto
