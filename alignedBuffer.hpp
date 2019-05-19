@@ -3,29 +3,32 @@
 #ifndef DIM_ALIGNED_BUFFER_HPP
 #define DIM_ALIGNED_BUFFER_HPP 1
 
+#include "utils.hpp"
+
 #include <memory>
 #include <cstdlib>
 
-#define DIM_ALIGNED_BUFFER_DISABLE_SIMD 0
+#if !defined DIM_ALIGNED_BUFFER_DISABLE_SIMD
+# define DIM_ALIGNED_BUFFER_DISABLE_SIMD 0
+#endif
 
 #if !DIM_ALIGNED_BUFFER_DISABLE_SIMD
 # include "simd.hpp"
 #endif
 
-#define DIM_RESTRICT __restrict__
-
-#define DIM_ASSUME_ALIGNED(a) __attribute__((assume_aligned(a)))
-
 namespace dim {
 
 template<typename T,
-         int Alignment=64> // assumed cache-line size
+         int Alignment=assumed_cacheline_size>
 class AlignedBuffer
 {
 public:
 
   static_assert(std::is_pod_v<T>,
                 "plain-old-data type expected");
+
+  static_assert((Alignment>0)&&((Alignment&(Alignment-1))==0),
+                "positive power-of-two alignment expected");
 
   static constexpr auto alignment=Alignment;
 
@@ -48,7 +51,7 @@ public:
     auto *p=std::aligned_alloc(alignment, padded);
 #endif
     data_.reset(reinterpret_cast<T *>(p));
-    fill(*this, T{});
+    std::fill(data_.get(), data_.get()+(padded/int(sizeof(T))), T{});
   }
 
   int
@@ -71,6 +74,9 @@ public:
 
 #if !DIM_ALIGNED_BUFFER_DISABLE_SIMD
   using simd_t = dim::simd::simd_t<T, dim::simd::max_vector_size>;
+
+  static_assert((alignment%simd_t::vector_size)==0,
+                "alignment should be a multiple of simd vector size");
 
   simd_t *
   simd_data() DIM_ASSUME_ALIGNED(alignment)
@@ -115,7 +121,9 @@ private:
 # define DIM_ALIGNED_BUFFER_ACCESS_CDATA(id) \
     const auto * DIM_RESTRICT d##id=buffer##id.cdata();
 # define DIM_ALIGNED_BUFFER_ITERATE(call) \
-    for(auto i=0, i_end=buffer1.count(); i<i_end; ++i) { call; }
+    const auto count=buffer1.count(); \
+    for(auto [i, i_end]=dim::sequence_part(count, part_id, part_count); \
+        i<i_end; ++i) { call; }
 #else
 # define DIM_ALIGNED_BUFFER_ACCESS_DATA(id) \
     auto * DIM_RESTRICT d##id=buffer##id.simd_data(); \
@@ -126,8 +134,9 @@ private:
     using simd_t##id = typename std::decay_t<decltype(buffer##id)>::simd_t; \
     static_assert(simd_t1::value_count==simd_t##id::value_count);
 # define DIM_ALIGNED_BUFFER_ITERATE(call) \
-    const auto count=buffer1.count(); \
-    for(auto i=0, i_end=(count+simd_t1::value_count-1)/simd_t1::value_count; \
+    const auto count=(buffer1.count()+simd_t1::value_count-1)/ \
+                     simd_t1::value_count; \
+    for(auto [i, i_end]= dim::sequence_part(count, part_id, part_count); \
         i<i_end; ++i) { call; }
 #endif
 
@@ -135,7 +144,8 @@ template<typename T1,
          typename Fnct>
 inline
 void
-apply0(const AlignedBuffer<T1> &buffer1,
+apply0(int part_id, int part_count,
+       const AlignedBuffer<T1> &buffer1,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(1)
@@ -147,7 +157,8 @@ template<typename T1,
          typename Fnct>
 inline
 void
-apply0(const AlignedBuffer<T1> &buffer1,
+apply0(int part_id, int part_count,
+       const AlignedBuffer<T1> &buffer1,
        const AlignedBuffer<T2> &buffer2,
        Fnct fnct)
 {
@@ -162,7 +173,8 @@ template<typename T1,
          typename Fnct>
 inline
 void
-apply0(const AlignedBuffer<T1> &buffer1,
+apply0(int part_id, int part_count,
+       const AlignedBuffer<T1> &buffer1,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        Fnct fnct)
@@ -180,7 +192,8 @@ template<typename T1,
          typename Fnct>
 inline
 void
-apply0(const AlignedBuffer<T1> &buffer1,
+apply0(int part_id, int part_count,
+       const AlignedBuffer<T1> &buffer1,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
@@ -201,7 +214,8 @@ template<typename T1,
          typename Fnct>
 inline
 void
-apply0(const AlignedBuffer<T1> &buffer1,
+apply0(int part_id, int part_count,
+       const AlignedBuffer<T1> &buffer1,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
@@ -225,7 +239,8 @@ template<typename T1,
          typename Fnct>
 inline
 void
-apply0(const AlignedBuffer<T1> &buffer1,
+apply0(int part_id, int part_count,
+       const AlignedBuffer<T1> &buffer1,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
@@ -249,6 +264,7 @@ template<typename T1,
 inline
 void
 apply1(AlignedBuffer<T1> &buffer1,
+       int part_id, int part_count,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
@@ -261,6 +277,7 @@ template<typename T1,
 inline
 void
 apply1(AlignedBuffer<T1> &buffer1,
+       int part_id, int part_count,
        const AlignedBuffer<T2> &buffer2,
        Fnct fnct)
 {
@@ -276,6 +293,7 @@ template<typename T1,
 inline
 void
 apply1(AlignedBuffer<T1> &buffer1,
+       int part_id, int part_count,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        Fnct fnct)
@@ -294,6 +312,7 @@ template<typename T1,
 inline
 void
 apply1(AlignedBuffer<T1> &buffer1,
+       int part_id, int part_count,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
@@ -315,6 +334,7 @@ template<typename T1,
 inline
 void
 apply1(AlignedBuffer<T1> &buffer1,
+       int part_id, int part_count,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
@@ -339,6 +359,7 @@ template<typename T1,
 inline
 void
 apply1(AlignedBuffer<T1> &buffer1,
+       int part_id, int part_count,
        const AlignedBuffer<T2> &buffer2,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
@@ -364,6 +385,7 @@ inline
 void
 apply2(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
+       int part_id, int part_count,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
@@ -379,6 +401,7 @@ inline
 void
 apply2(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
+       int part_id, int part_count,
        const AlignedBuffer<T3> &buffer3,
        Fnct fnct)
 {
@@ -397,6 +420,7 @@ inline
 void
 apply2(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
+       int part_id, int part_count,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
        Fnct fnct)
@@ -418,6 +442,7 @@ inline
 void
 apply2(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
+       int part_id, int part_count,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
        const AlignedBuffer<T5> &buffer5,
@@ -442,6 +467,7 @@ inline
 void
 apply2(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
+       int part_id, int part_count,
        const AlignedBuffer<T3> &buffer3,
        const AlignedBuffer<T4> &buffer4,
        const AlignedBuffer<T5> &buffer5,
@@ -468,6 +494,7 @@ void
 apply3(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
        AlignedBuffer<T3> &buffer3,
+       int part_id, int part_count,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
@@ -486,6 +513,7 @@ void
 apply3(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
        AlignedBuffer<T3> &buffer3,
+       int part_id, int part_count,
        const AlignedBuffer<T4> &buffer4,
        Fnct fnct)
 {
@@ -507,6 +535,7 @@ void
 apply3(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
        AlignedBuffer<T3> &buffer3,
+       int part_id, int part_count,
        const AlignedBuffer<T4> &buffer4,
        const AlignedBuffer<T5> &buffer5,
        Fnct fnct)
@@ -531,6 +560,7 @@ void
 apply3(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
        AlignedBuffer<T3> &buffer3,
+       int part_id, int part_count,
        const AlignedBuffer<T4> &buffer4,
        const AlignedBuffer<T5> &buffer5,
        const AlignedBuffer<T6> &buffer6,
@@ -558,6 +588,7 @@ apply4(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
        AlignedBuffer<T3> &buffer3,
        AlignedBuffer<T4> &buffer4,
+       int part_id, int part_count,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
@@ -579,6 +610,7 @@ apply4(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
        AlignedBuffer<T3> &buffer3,
        AlignedBuffer<T4> &buffer4,
+       int part_id, int part_count,
        const AlignedBuffer<T5> &buffer5,
        Fnct fnct)
 {
@@ -603,6 +635,7 @@ apply4(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T2> &buffer2,
        AlignedBuffer<T3> &buffer3,
        AlignedBuffer<T4> &buffer4,
+       int part_id, int part_count,
        const AlignedBuffer<T5> &buffer5,
        const AlignedBuffer<T6> &buffer6,
        Fnct fnct)
@@ -631,6 +664,7 @@ apply5(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T3> &buffer3,
        AlignedBuffer<T4> &buffer4,
        AlignedBuffer<T5> &buffer5,
+       int part_id, int part_count,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
@@ -655,6 +689,7 @@ apply5(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T3> &buffer3,
        AlignedBuffer<T4> &buffer4,
        AlignedBuffer<T5> &buffer5,
+       int part_id, int part_count,
        const AlignedBuffer<T6> &buffer6,
        Fnct fnct)
 {
@@ -684,6 +719,7 @@ apply6(AlignedBuffer<T1> &buffer1,
        AlignedBuffer<T4> &buffer4,
        AlignedBuffer<T5> &buffer5,
        AlignedBuffer<T6> &buffer6,
+       int part_id, int part_count,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
@@ -705,9 +741,11 @@ template<typename T>
 inline
 void
 fill(AlignedBuffer<T> &dst,
+     int part_id, int part_count,
      const T &value)
 {
   apply1(dst,
+    part_id, part_count,
     [&value](auto &p)
     {
       const std::decay_t<decltype(p)> v{value};
@@ -719,13 +757,15 @@ template<typename T>
 inline
 void
 fill(AlignedBuffer<T> &dst,
+     int part_id, int part_count,
      int width, [[maybe_unused]] int height,
      int x, int y, int w, int h,
      const T &value)
 {
   // FIXME: is there a simd-friendly way to do this?
   auto * DIM_RESTRICT d=dst.data();
-  for(auto yid=y, yid_end=y+h; yid<yid_end; ++yid)
+  for(auto [yid, yid_end]=dim::sequence_part(y, y+h, part_id, part_count);
+      yid<yid_end; ++yid)
   {
     const auto xid=yid*width+x;
     for(auto id=xid, id_end=xid+w; id<id_end; ++id)
@@ -738,12 +778,14 @@ fill(AlignedBuffer<T> &dst,
 template<typename T>
 inline
 T
-mean(const AlignedBuffer<T> &buffer)
+mean(const AlignedBuffer<T> &buffer,
+     int part_id, int part_count)
 {
   // FIXME: consider horizontal sum for simd
   auto sum=T{};
   apply0(
     buffer,
+    part_id, part_count,
     [&sum](const auto & p)
     {
       sum+=p;
@@ -755,13 +797,15 @@ template<typename T>
 inline
 T
 mean(const AlignedBuffer<T> &buffer,
+     int part_id, int part_count,
      int width, [[maybe_unused]] int height,
      int x, int y, int w, int h)
 {
   // FIXME: is there a simd-friendly way to do this?
   auto sum=T{};
   const auto * DIM_RESTRICT p=buffer.cdata();
-  for(auto yid=y, yid_end=y+h; yid<yid_end; ++yid)
+  for(auto [yid, yid_end]=dim::sequence_part(y, y+h, part_id, part_count);
+      yid<yid_end; ++yid)
   {
     const auto xid=yid*width+x;
     for(auto id=xid, id_end=xid+w; id<id_end; ++id)
