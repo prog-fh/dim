@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
-#ifndef DIM_ENUMTYPE_HPP
-#define DIM_ENUMTYPE_HPP 1
+#ifndef DIM_ENUM_TYPE_HPP
+#define DIM_ENUM_TYPE_HPP 1
 
 /**
 inspired from
@@ -147,14 +147,14 @@ private:
 
 } // namespace dim
 
-#endif // DIM_ENUMTYPE_HPP
+#endif // DIM_ENUM_TYPE_HPP
 
 //----------------------------------------------------------------------------
 // implementation details (don't look below!)
 //----------------------------------------------------------------------------
 
-#ifndef DIM_ENUMTYPE_HPP_IMPL
-#define DIM_ENUMTYPE_HPP_IMPL 1
+#ifndef DIM_ENUM_TYPE_HPP_IMPL
+#define DIM_ENUM_TYPE_HPP_IMPL 1
 
 #include <utility>
 #include <typeinfo>
@@ -467,6 +467,6 @@ EnumType<Types...>::use_(Rank rank,
 
 } // namespace dim
 
-#endif // DIM_ENUMTYPE_HPP_IMPL
+#endif // DIM_ENUM_TYPE_HPP_IMPL
 
 //----------------------------------------------------------------------------
