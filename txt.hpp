@@ -6,123 +6,6 @@
 #include <type_traits>
 #include <string>
 #include <vector>
-
-namespace dim::txt {
-
-template<typename T,
-         typename = std::enable_if_t<std::is_integral_v<T>>>
-std::string
-hex(T value);
-
-std::string
-hex(const void *value);
-
-//----------------------------------------------------------------------------
-
-template<typename T,
-         typename = std::enable_if_t<std::is_integral_v<T>>>
-std::string
-bin(T value);
-
-std::string
-bin(const void *value);
-
-//----------------------------------------------------------------------------
-
-void
-fmt(std::string &inout_result,
-    const char *value);
-
-void
-fmt(std::string &inout_result,
-    const std::string &value);
-
-void
-fmt(std::string &inout_result,
-    bool value);
-
-void
-fmt(std::string &inout_result,
-    char value);
-
-template<typename T,
-         typename = std::enable_if_t<std::is_integral_v<T>>>
-void
-fmt(std::string &inout_result,
-    T value);
-
-void
-fmt(std::string &inout_result,
-    float value);
-
-void
-fmt(std::string &inout_result,
-    double value);
-
-template<typename Elem>
-void
-fmt(std::string &inout_result,
-    const std::vector<Elem> &value);
-
-template<typename First,
-         typename ...Args>
-void
-fmt(std::string &inout_result,
-    const char *format,
-    First first,
-    Args &&...args);
-
-template<typename ...Args>
-std::string
-txt(const char *format,
-    Args &&...args);
-
-//----------------------------------------------------------------------------
-
-template<typename ...Args>
-int // written bytes
-out(const char *format,
-    Args &&...args);
-
-template<typename ...Args>
-int // written bytes
-err(const char *format,
-    Args &&...args);
-
-//----------------------------------------------------------------------------
-
-template<typename ...Args>
-int // extraction count
-extract(const std::string &input,
-        Args &&...args);
-
-template<typename ...Args>
-int // extraction count
-extract(const char *input,
-        Args &&...args);
-
-//----------------------------------------------------------------------------
-
-std::string
-read(int capacity=0x100);
-
-std::string
-read_all(int capacity);
-
-std::string
-read_line();
-
-} // namespace dim::txt
-
-#endif // DIM_TXT_HPP
-
-//----------------------------------------------------------------------------
-// implementation details (don't look below!)
-//----------------------------------------------------------------------------
-
-#ifndef DIM_TXT_HPP_IMPL
-#define DIM_TXT_HPP_IMPL 1
-
 #include <cmath>
 #include <utility>
 #include <cctype>
@@ -132,28 +15,6 @@ read_line();
 #include <unistd.h>
 
 namespace dim::txt {
-
-namespace impl_ {
-
-template<typename Elem>
-inline
-void
-uninitialised_resize_(std::basic_string<Elem> &s,
-                      typename std::basic_string<Elem>::size_type sz)
-{
-  static_assert(std::is_pod_v<Elem>,
-                "plain-old-data elements expected");
-  struct PodElem
-  {
-    Elem uninitialised;
-    PodElem() { }; // disable zero-initialisation
-  };
-  s.reserve(sz);
-  auto &raw=reinterpret_cast<std::basic_string<PodElem> &>(s);
-  raw.resize(sz);
-}
-
-} // namespace impl_
 
 template<typename T,
          typename = std::enable_if_t<std::is_integral_v<T>>>
@@ -186,6 +47,8 @@ hex(const void *value)
   return hex(reinterpret_cast<std::size_t>(value));
 }
 
+//----------------------------------------------------------------------------
+
 template<typename T,
          typename = std::enable_if_t<std::is_integral_v<T>>>
 inline
@@ -215,6 +78,8 @@ bin(const void *value)
 {
   return bin(reinterpret_cast<std::size_t>(value));
 }
+
+//----------------------------------------------------------------------------
 
 inline
 void
@@ -300,14 +165,6 @@ fmt(std::string &inout_result,
 inline
 void
 fmt(std::string &inout_result,
-    float value)
-{
-  fmt(inout_result, static_cast<double>(value));
-}
-
-inline
-void
-fmt(std::string &inout_result,
     double value)
 {
   if(!std::isfinite(value))
@@ -364,6 +221,14 @@ fmt(std::string &inout_result,
   }
 }
 
+inline
+void
+fmt(std::string &inout_result,
+    float value)
+{
+  fmt(inout_result, static_cast<double>(value));
+}
+
 template<typename Elem>
 inline
 void
@@ -416,6 +281,8 @@ txt(const char *format,
   return result;
 }
 
+//----------------------------------------------------------------------------
+
 template<typename ...Args>
 inline
 int // written bytes
@@ -435,6 +302,8 @@ err(const char *format,
   const auto str=txt(format, std::forward<Args>(args)...);
   return int(::write(STDERR_FILENO, data(str), size(str)));
 }
+
+//----------------------------------------------------------------------------
 
 namespace impl_ {
 
@@ -833,9 +702,33 @@ extract(const char *input,
   return count;
 }
 
+//----------------------------------------------------------------------------
+
+namespace impl_ {
+
+template<typename Elem>
+inline
+void
+uninitialised_resize_(std::basic_string<Elem> &s,
+                      typename std::basic_string<Elem>::size_type sz)
+{
+  static_assert(std::is_pod_v<Elem>,
+                "plain-old-data elements expected");
+  struct PodElem
+  {
+    Elem uninitialised;
+    PodElem() { }; // disable zero-initialisation
+  };
+  s.reserve(sz);
+  auto &raw=reinterpret_cast<std::basic_string<PodElem> &>(s);
+  raw.resize(sz);
+}
+
+} // namespace impl_
+
 inline
 std::string
-read(int capacity)
+read(int capacity=0x100)
 {
   auto result=std::string{};
   impl_::uninitialised_resize_(result, capacity);
@@ -884,6 +777,6 @@ read_line()
 
 } // namespace dim::txt
 
-#endif // DIM_TXT_HPP_IMPL
+#endif // DIM_TXT_HPP
 
 //----------------------------------------------------------------------------

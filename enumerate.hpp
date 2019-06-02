@@ -10,8 +10,11 @@ inspired from
 
 #include <type_traits>
 #include <iterator>
+#include <utility>
 
 namespace dim {
+
+namespace impl_ {
 
 template<typename Container>
 using enumerate_container_support =
@@ -20,52 +23,18 @@ using enumerate_container_support =
            size(std::declval<Container>()),
            1);
 
-template<typename Container,
-         enumerate_container_support<Container> =1>
-auto // iterable 
-enumerate(Container &&container);
-
-template<typename Container,
-         enumerate_container_support<Container> =1>
-auto // iterable
-cenumerate(const Container &container);
-
 template<typename Counter>
 using enumerate_counter_support =
   decltype((std::declval<Counter>()!=std::declval<Counter>()),
            ++std::declval<std::add_lvalue_reference_t<Counter>>(),
            1);
 
-template<typename Counter,
-         enumerate_counter_support<Counter> =1>
-auto
-enumerate(Counter from_count,
-          Counter to_count);
-
-template<typename Counter,
-         enumerate_counter_support<Counter> =1>
-auto
-enumerate(Counter to_count);
-
-} // namespace dim
-
-#endif // DIM_ENUMERATE_HPP
-
-//----------------------------------------------------------------------------
-// implementation details (don't look below!)
-//----------------------------------------------------------------------------
-
-#ifndef DIM_ENUMERATE_HPP_IMPL
-#define DIM_ENUMERATE_HPP_IMPL 1
-
-#include <utility>
-
-namespace dim {
+} // namespace impl_
 
 template<typename Container,
-         enumerate_container_support<Container>>
+         impl_::enumerate_container_support<Container> =1>
 inline
-auto
+auto // iterable
 enumerate(Container &&container)
 {
   using std::begin;
@@ -98,18 +67,18 @@ enumerate(Container &&container)
 }
 
 template<typename Container,
-         enumerate_container_support<Container>>
+         impl_::enumerate_container_support<Container> =1>
 inline
-auto
+auto // iterable
 cenumerate(const Container &container)
 {
   return enumerate(container);
 }
 
 template<typename Counter,
-         enumerate_counter_support<Counter>>
+         impl_::enumerate_counter_support<Counter> =1>
 inline
-auto
+auto // iterable
 enumerate(Counter from_count,
           Counter to_count)
 {
@@ -131,9 +100,9 @@ enumerate(Counter from_count,
 }
 
 template<typename Counter,
-         enumerate_counter_support<Counter>>
+         impl_::enumerate_counter_support<Counter> =1>
 inline
-auto
+auto // iterable
 enumerate(Counter to_count)
 {
   return enumerate(Counter{}, to_count);
@@ -141,6 +110,6 @@ enumerate(Counter to_count)
 
 } // namespace dim
 
-#endif // DIM_ENUMERATE_HPP_IMPL
+#endif // DIM_ENUMERATE_HPP
 
 //----------------------------------------------------------------------------

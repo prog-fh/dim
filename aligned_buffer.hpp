@@ -818,8 +818,6 @@ mean(const AlignedBuffer<T> &buffer,
 
 } // namespace dim
 
-#undef DIM_ALIGNED_BUFFER_DISABLE_SIMD
-
 #endif // DIM_ALIGNED_BUFFER_HPP
 
 //----------------------------------------------------------------------------

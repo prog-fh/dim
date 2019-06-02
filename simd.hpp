@@ -13,13 +13,17 @@
 
 namespace dim::simd {
 
+namespace impl_ {
+
 template<typename ValueType,
          int VectorSize>
 struct simd_helper { using type = void; };
 
+} // namespace impl_
+
 template<typename ValueType,
          int VectorSize>
-using simd_t = typename simd_helper<
+using simd_t = typename impl_::simd_helper<
   typename std::decay<ValueType>::type, VectorSize>::type;
 
 template<typename VectorType>
@@ -154,7 +158,7 @@ constexpr auto max_vector_size=DIM_SIMD_MAX_VECTOR_SIZE;
 
 #define DIM_SIMD_DEFINE_TYPE(name, base, vec_size) \
   using name = Simd<base __attribute__((__vector_size__(vec_size)))>; \
-  template<> struct simd_helper<base, vec_size> { using type = name; };
+  template<> struct impl_::simd_helper<base, vec_size> { using type = name; };
 
 #if DIM_SIMD_MAX_VECTOR_SIZE>=64
   DIM_SIMD_DEFINE_TYPE( u8x64_t,  std::uint8_t, 64)
@@ -790,25 +794,52 @@ store_suffix(typename Simd<VectorType>::value_type *values,
 
 //~~~~ math functions ~~~~
 
-// FIXME: consider using intrinsics since a for loop over the vector
-// components is not always optimised as a single simd instruction
-// see: https://software.intel.com/sites/landingpage/IntrinsicsGuide/
-// in SVML: _mm_sqrt_ps, _mm_log_ps, _mm_pow_ps...
-//
-// https://stackoverflow.com/questions/31978592/c-error-mm-sin-ps-was-not-declared-in-this-scope
-// --> mentions libmvec
-
-template<typename VectorType>
+template<typename VectorType,
+         typename Fnct>
 auto
-sqrt(Simd<VectorType> s)
+transform(Simd<VectorType> s,
+          Fnct fnct)
 {
+  // hopefuly, for simple math functions, the compiler will be able
+  // to call the appropriate simd instruction; in other cases it
+  // will serialise the calls
   VectorType result;
   for(auto i=0; i<s.value_count; ++i)
   {
-    result[i]=std::sqrt(s[i]);
+    result[i]=fnct(s[i]);
   }
   return Simd{result};
 }
+
+#define DIM_SIMD_TRANSFORM(name, fnct) \
+        template<typename VectorType> \
+        auto \
+        name(Simd<VectorType> s) \
+        { \
+          using value_t = typename Simd<VectorType>::value_type; \
+          return transform(s, static_cast<value_t (*)(value_t)>(fnct)); \
+        }
+
+DIM_SIMD_TRANSFORM(abs,   std::abs)
+DIM_SIMD_TRANSFORM(exp,   std::exp)
+DIM_SIMD_TRANSFORM(log,   std::log)
+DIM_SIMD_TRANSFORM(sqrt,  std::sqrt)
+DIM_SIMD_TRANSFORM(cbrt,  std::cbrt)
+DIM_SIMD_TRANSFORM(sin,   std::sin)
+DIM_SIMD_TRANSFORM(cos,   std::cos)
+DIM_SIMD_TRANSFORM(tan,   std::tan)
+DIM_SIMD_TRANSFORM(asin,  std::asin)
+DIM_SIMD_TRANSFORM(acos,  std::acos)
+DIM_SIMD_TRANSFORM(atan,  std::atan)
+DIM_SIMD_TRANSFORM(sinh,  std::sinh)
+DIM_SIMD_TRANSFORM(cosh,  std::cosh)
+DIM_SIMD_TRANSFORM(tanh,  std::tanh)
+DIM_SIMD_TRANSFORM(ceil,  std::sinh)
+DIM_SIMD_TRANSFORM(floor, std::floor)
+DIM_SIMD_TRANSFORM(trunc, std::trunc)
+DIM_SIMD_TRANSFORM(round, std::round)
+
+#undef DIM_SIMD_TRANSFORM
 
 //~~~~ display operations ~~~~
 
