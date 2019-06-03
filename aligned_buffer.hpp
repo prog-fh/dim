@@ -73,7 +73,7 @@ public:
   }
 
 #if !DIM_ALIGNED_BUFFER_DISABLE_SIMD
-  using simd_t = dim::simd::simd_t<T, dim::simd::max_vector_size>;
+  using simd_t = simd::simd_t<T, simd::max_vector_size>;
 
   static_assert((alignment%simd_t::vector_size)==0,
                 "alignment should be a multiple of simd vector size");
@@ -122,7 +122,7 @@ private:
     const auto * DIM_RESTRICT d##id=buffer##id.cdata();
 # define DIM_ALIGNED_BUFFER_ITERATE(call) \
     const auto count=buffer1.count(); \
-    for(auto [i, i_end]=dim::sequence_part(count, part_id, part_count); \
+    for(auto [i, i_end]=sequence_part(count, part_id, part_count); \
         i<i_end; ++i) { call; }
 #else
 # define DIM_ALIGNED_BUFFER_ACCESS_DATA(id) \
@@ -136,7 +136,7 @@ private:
 # define DIM_ALIGNED_BUFFER_ITERATE(call) \
     const auto count=(buffer1.count()+simd_t1::value_count-1)/ \
                      simd_t1::value_count; \
-    for(auto [i, i_end]= dim::sequence_part(count, part_id, part_count); \
+    for(auto [i, i_end]= sequence_part(count, part_id, part_count); \
         i<i_end; ++i) { call; }
 #endif
 
@@ -748,8 +748,7 @@ fill(AlignedBuffer<T> &dst,
     part_id, part_count,
     [&value](auto &p)
     {
-      const std::decay_t<decltype(p)> v{value};
-      p=v;
+      p=value;
     });
 }
 
@@ -762,9 +761,13 @@ fill(AlignedBuffer<T> &dst,
      int x, int y, int w, int h,
      const T &value)
 {
-  // FIXME: is there a simd-friendly way to do this?
+  if((x==0)&&(w==width)&&(y==0)&&(h==height))
+  {
+    return fill(dst, part_id, part_count, value);
+  }
+#if DIM_ALIGNED_BUFFER_DISABLE_SIMD
   auto * DIM_RESTRICT d=dst.data();
-  for(auto [yid, yid_end]=dim::sequence_part(y, y+h, part_id, part_count);
+  for(auto [yid, yid_end]=sequence_part(y, y+h, part_id, part_count);
       yid<yid_end; ++yid)
   {
     const auto xid=yid*width+x;
@@ -773,6 +776,24 @@ fill(AlignedBuffer<T> &dst,
       d[id]=value;
     }
   }
+#else
+  using simd_t = typename AlignedBuffer<T>::simd_t;
+  const auto simd_value=simd_t{value};
+  for(auto [yid, yid_end]=sequence_part(y, y+h, part_id, part_count);
+      yid<yid_end; ++yid)
+  {
+    auto * DIM_RESTRICT d=dst.data()+yid*width+x;
+    const auto [pfx, count, sfx]=simd::split<simd_t>(d, w);
+    simd::store_prefix(d, pfx, simd_value);
+    d+=pfx;
+    for(auto i=0; i<count; ++i)
+    {
+      simd::store_a(d, simd_value);
+      d+=simd_t::value_count;
+    }
+    simd::store_suffix(d, sfx, simd_value);
+  }
+#endif
 }
 
 template<typename T>
@@ -781,16 +802,23 @@ T
 mean(const AlignedBuffer<T> &buffer,
      int part_id, int part_count)
 {
-  // FIXME: consider horizontal sum for simd
+#if DIM_ALIGNED_BUFFER_DISABLE_SIMD
   auto sum=T{};
+#else
+  auto sum=typename AlignedBuffer<T>::simd_t{};
+#endif
   apply0(
-    buffer,
     part_id, part_count,
+    buffer,
     [&sum](const auto & p)
     {
       sum+=p;
     });
+#if DIM_ALIGNED_BUFFER_DISABLE_SIMD
   return sum/T(buffer.count());
+#else
+  return horizontal_sum(sum)/T(buffer.count());
+#endif
 }
 
 template<typename T>
@@ -801,10 +829,14 @@ mean(const AlignedBuffer<T> &buffer,
      int width, [[maybe_unused]] int height,
      int x, int y, int w, int h)
 {
-  // FIXME: is there a simd-friendly way to do this?
+  if((x==0)&&(w==width)&&(y==0)&&(h==height))
+  {
+    return mean(buffer, part_id, part_count);
+  }
+#if DIM_ALIGNED_BUFFER_DISABLE_SIMD
   auto sum=T{};
   const auto * DIM_RESTRICT p=buffer.cdata();
-  for(auto [yid, yid_end]=dim::sequence_part(y, y+h, part_id, part_count);
+  for(auto [yid, yid_end]=sequence_part(y, y+h, part_id, part_count);
       yid<yid_end; ++yid)
   {
     const auto xid=yid*width+x;
@@ -814,6 +846,25 @@ mean(const AlignedBuffer<T> &buffer,
     }
   }
   return sum/T(w*h);
+#else
+  using simd_t = typename AlignedBuffer<T>::simd_t;
+  auto sum=simd_t{};
+  for(auto [yid, yid_end]=sequence_part(y, y+h, part_id, part_count);
+      yid<yid_end; ++yid)
+  {
+    const auto * DIM_RESTRICT p=buffer.cdata()+yid*width+x;
+    const auto [pfx, count, sfx]=simd::split<simd_t>(p, w);
+    sum+=simd::load_prefix<simd_t>(p, pfx);
+    p+=pfx;
+    for(auto i=0; i<count; ++i)
+    {
+      sum+=simd::load_a<simd_t>(p);
+      p+=simd_t::value_count;
+    }
+    sum+=simd::load_suffix<simd_t>(p, sfx);
+  }
+  return horizontal_sum(sum)/T(w*h);
+#endif
 }
 
 } // namespace dim

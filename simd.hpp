@@ -87,7 +87,7 @@ public:
         return vector_type{v};
       }
     }()} {}
-  constexpr Simd & operator=(value_type v) { v_=Simd{v}; return *this; }
+  constexpr Simd & operator=(value_type v) { return operator=(Simd{v}); }
 
   constexpr Simd(const Simd &) =default;
   constexpr Simd & operator=(const Simd &) =default;
@@ -840,6 +840,34 @@ DIM_SIMD_TRANSFORM(trunc, std::trunc)
 DIM_SIMD_TRANSFORM(round, std::round)
 
 #undef DIM_SIMD_TRANSFORM
+
+//~~~~ horizontal operations ~~~~
+
+template<typename VectorType>
+inline
+auto
+horizontal_sum(const Simd<VectorType> &s)
+{
+  auto sum=typename Simd<VectorType>::value_type{};
+  for(auto i=0; i<s.value_count; ++i)
+  {
+    sum+=s[i];
+  }
+  return sum;
+}
+
+template<typename VectorType>
+inline
+auto
+horizontal_product(const Simd<VectorType> &s)
+{
+  auto product=typename Simd<VectorType>::value_type{1};
+  for(auto i=0; i<s.value_count; ++i)
+  {
+    product*=s[i];
+  }
+  return product;
+}
 
 //~~~~ display operations ~~~~
 
