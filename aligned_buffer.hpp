@@ -799,42 +799,42 @@ fill(AlignedBuffer<T> &dst,
 template<typename T>
 inline
 T
-mean(const AlignedBuffer<T> &buffer,
-     int part_id, int part_count)
+sum(const AlignedBuffer<T> &buffer,
+    int part_id, int part_count)
 {
 #if DIM_ALIGNED_BUFFER_DISABLE_SIMD
-  auto sum=T{};
+  auto accum=T{};
 #else
-  auto sum=typename AlignedBuffer<T>::simd_t{};
+  auto accum=typename AlignedBuffer<T>::simd_t{};
 #endif
   apply0(
     part_id, part_count,
     buffer,
-    [&sum](const auto & p)
+    [&accum](const auto & p)
     {
-      sum+=p;
+      accum+=p;
     });
 #if DIM_ALIGNED_BUFFER_DISABLE_SIMD
-  return sum/T(buffer.count());
+  return accum;
 #else
-  return horizontal_sum(sum)/T(buffer.count());
+  return horizontal_sum(accum);
 #endif
 }
 
 template<typename T>
 inline
 T
-mean(const AlignedBuffer<T> &buffer,
-     int part_id, int part_count,
-     int width, [[maybe_unused]] int height,
-     int x, int y, int w, int h)
+sum(const AlignedBuffer<T> &buffer,
+    int part_id, int part_count,
+    int width, [[maybe_unused]] int height,
+    int x, int y, int w, int h)
 {
   if((x==0)&&(w==width)&&(y==0)&&(h==height))
   {
-    return mean(buffer, part_id, part_count);
+    return sum(buffer, part_id, part_count);
   }
 #if DIM_ALIGNED_BUFFER_DISABLE_SIMD
-  auto sum=T{};
+  auto accum=T{};
   const auto * DIM_RESTRICT p=buffer.cdata();
   for(auto [yid, yid_end]=sequence_part(y, y+h, part_id, part_count);
       yid<yid_end; ++yid)
@@ -842,28 +842,28 @@ mean(const AlignedBuffer<T> &buffer,
     const auto xid=yid*width+x;
     for(auto id=xid, id_end=xid+w; id<id_end; ++id)
     {
-      sum+=p[id];
+      accum+=p[id];
     }
   }
-  return sum/T(w*h);
+  return accum;
 #else
   using simd_t = typename AlignedBuffer<T>::simd_t;
-  auto sum=simd_t{};
+  auto accum=simd_t{};
   for(auto [yid, yid_end]=sequence_part(y, y+h, part_id, part_count);
       yid<yid_end; ++yid)
   {
     const auto * DIM_RESTRICT p=buffer.cdata()+yid*width+x;
     const auto [pfx, count, sfx]=simd::split<simd_t>(p, w);
-    sum+=simd::load_prefix<simd_t>(p, pfx);
+    accum+=simd::load_prefix<simd_t>(p, pfx);
     p+=pfx;
     for(auto i=0; i<count; ++i)
     {
-      sum+=simd::load_a<simd_t>(p);
+      accum+=simd::load_a<simd_t>(p);
       p+=simd_t::value_count;
     }
-    sum+=simd::load_suffix<simd_t>(p, sfx);
+    accum+=simd::load_suffix<simd_t>(p, sfx);
   }
-  return horizontal_sum(sum)/T(w*h);
+  return horizontal_sum(accum);
 #endif
 }
 
