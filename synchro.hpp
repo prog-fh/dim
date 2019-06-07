@@ -57,7 +57,6 @@ public:
   }
 
 private:
-  int thread_count_;
   std::atomic<sync_t> sync_;
   std::atomic<int> ack_count_;
 };

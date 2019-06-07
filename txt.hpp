@@ -476,44 +476,45 @@ extract_arg_(const char *&input,
         }
       }
     }
-    auto consume_digits=[&](const auto &limit)
-    {
-      using tmp_type = std::remove_const_t<std::remove_reference_t<
-                                           decltype(limit)>>;
-      auto tmp=tmp_type{};
-      const auto prev_limit=limit/10;
-      auto start=remaining;
-      for(; remaining!=0; ++input, --remaining)
+    const auto consume_digits=
+      [&](const auto &limit)
       {
-        const auto c=*input;
-        if(!std::isdigit(c))
+        using tmp_type = std::remove_const_t<std::remove_reference_t<
+                                             decltype(limit)>>;
+        auto tmp=tmp_type{};
+        const auto prev_limit=limit/10;
+        auto start=remaining;
+        for(; remaining!=0; ++input, --remaining)
         {
-          break;
+          const auto c=*input;
+          if(!std::isdigit(c))
+          {
+            break;
+          }
+          if(failure)
+          {
+            continue;
+          }
+          if(tmp>prev_limit)
+          {
+            failure=true;
+            continue;
+          }
+          tmp=static_cast<tmp_type>(tmp*10);
+          const auto digit=static_cast<tmp_type>(c-'0');
+          if(limit-digit<tmp)
+          {
+            failure=true;
+            continue;
+          }
+          tmp=static_cast<tmp_type>(tmp+digit);
         }
-        if(failure)
-        {
-          continue;
-        }
-        if(tmp>prev_limit)
+        if(remaining==start)
         {
           failure=true;
-          continue;
         }
-        tmp=static_cast<tmp_type>(tmp*10);
-        const auto digit=static_cast<tmp_type>(c-'0');
-        if(limit-digit<tmp)
-        {
-          failure=true;
-          continue;
-        }
-        tmp=static_cast<tmp_type>(tmp+digit);
-      }
-      if(remaining==start)
-      {
-        failure=true;
-      }
-      return tmp;
-    };
+        return tmp;
+      };
     if constexpr(std::is_unsigned_v<T>)
     {
       const auto limit=std::numeric_limits<T>::max();
