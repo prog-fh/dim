@@ -9,6 +9,11 @@
 #include <iostream>
 #include <thread>
 
+#if defined __APPLE__
+# include <mach/mach.h>
+# include <mach/thread_policy.h>
+#endif
+
 namespace dim::cpu {
 
 namespace impl_ {
@@ -183,7 +188,7 @@ to_string(const TopologyGroup &grp)
     [&](const auto &grp, const auto &path)
     {
       txt+=std::string(2*(size(path)-1), ' ')+'*';
-      if(empty(path))
+      if(size(path)==1)
       {
         txt+=" HOST";
       }
@@ -215,23 +220,233 @@ operator<<(std::ostream &output,
   return output << to_string(grp);
 }
 
+inline
+bool // success
+bind_current_thread(CpuId cpu)
+{
+  if(cpu.id>=0)
+  {
+#if defined __linux__
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(cpu.id, &cpuset);
+    if(::pthread_setaffinity_np(::pthread_self(), sizeof(cpuset), &cpuset)==0)
+    {
+      return true;
+    }
+#elif defined _WIN32
+    GROUP_AFFINITY aff;
+    memset(&aff,0,sizeof(aff));
+    aff.Mask=1ULL<<(cpu.id&0x0000003F);
+    aff.Group=cpu.id>>6;
+    if(::SetThreadGroupAffinity(::GetCurrentThread(), &aff, nullptr)!=0)
+    {
+      return true;
+    }
+#elif defined __APPLE__
+    // FIXME: under MacOsX, affinity does not mean attachment to a specific CPU
+    thread_affinity_policy_data_t policy;
+    policy.affinity_tag=cpu.id;
+    if(::thread_policy_set(::pthread_mach_thread_np(::pthread_self()),
+                           THREAD_AFFINITY_POLICY,
+                           (thread_policy_t)&policy,
+                           THREAD_AFFINITY_POLICY_COUNT)==KERN_SUCCESS)
+    {
+      return true;
+    }
+#endif
+  }
+  return false;
+}
+
 } // namespace dim::cpu
+
+#include <sys/sysctl.h>
+#include <unistd.h>
+
+namespace dim::cpu::impl_ {
+
+#if defined CTL_HW
+  template<typename T>
+  inline
+  bool // success
+  hw_sysctl_(int hw_name,
+             T &result)
+  {
+    int name[2]={CTL_HW, hw_name};
+    auto len=sizeof(result);
+    for(;;)
+    {
+      const auto r=::sysctl(name, 2, &result, &len, nullptr, 0);
+      if(r>=0)
+      {
+        return true;
+      }
+      if(errno!=EINTR)
+      {
+        return false;
+      }
+    }
+  }
+
+  template<typename T>
+  inline
+  bool // success
+  sysctl_by_name_(const char *name,
+                  T &result)
+  {
+    auto len=sizeof(result);
+    for(;;)
+    {
+      const auto r=::sysctlbyname(name, &result, &len, nullptr, 0);
+      if(r>=0)
+      {
+        return true;
+      }
+      if(errno!=EINTR)
+      {
+        return false;
+      }
+    }
+  }
+#endif
+
+template<typename T>
+inline
+bool // success
+sysconf_(int name,
+         T &result)
+{
+  for(;;)
+  {
+    const auto r=::sysconf(name);
+    if(r>=0)
+    {
+      result=static_cast<T>(r);
+      return true;
+    }
+    if(errno!=EINTR)
+    {
+      return false;
+    }
+  }
+}
+
+inline
+int // detected cpu count or 0 if unknown
+detect_cpu_count_()
+{
+  auto cpu_count=int(std::thread::hardware_concurrency());
+#if defined _SC_NPROCESSORS_ONLN
+  if(cpu_count==0)
+  {
+    sysconf_(_SC_NPROCESSORS_ONLN, cpu_count);
+  }
+#endif
+#if defined HW_NCPU
+  if(cpu_count==0)
+  {
+    hw_sysctl_(HW_NCPU, cpu_count);
+  }
+#endif
+#if defined _WIN32
+  if(cpu_count==0)
+  {
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    cpu_count=info.dwNumberOfProcessors;
+  }
+#endif
+  return cpu_count;
+}
+
+inline
+int // detected cache size for level or 0 if unknown
+detect_cache_size_(int level)
+{
+  auto cache_size=0;
+#if defined _SC_LEVEL1_DCACHE_SIZE
+  if((cache_size==0)&&(level==1))
+  {
+    sysconf_(_SC_LEVEL1_DCACHE_SIZE, cache_size);
+  }
+#endif
+#if defined _SC_LEVEL2_CACHE_SIZE
+  if((cache_size==0)&&(level==2))
+  {
+    sysconf_(_SC_LEVEL2_CACHE_SIZE, cache_size);
+  }
+#endif
+#if defined _SC_LEVEL3_CACHE_SIZE
+  if((cache_size==0)&&(level==3))
+  {
+    sysconf_(_SC_LEVEL3_CACHE_SIZE, cache_size);
+  }
+#endif
+#if defined HW_L1DCACHESIZE
+  if((cache_size==0)&&(level==1))
+  {
+    hw_sysctl_(HW_L1DCACHESIZE, cache_size);
+  }
+#endif
+#if defined HW_L2CACHESIZE
+  if((cache_size==0)&&(level==2))
+  {
+    hw_sysctl_(HW_L2CACHESIZE, cache_size);
+  }
+#endif
+#if defined HW_L3CACHESIZE
+  if((cache_size==0)&&(level==3))
+  {
+    hw_sysctl_(HW_L3CACHESIZE, cache_size);
+  }
+#endif
+  return cache_size;
+}
+
+inline
+int // detected cache line for level or 0 if unknown
+detect_cache_line_(int level)
+{
+  auto cache_line=0;
+#if defined _SC_LEVEL1_DCACHE_LINESIZE
+  if((cache_line==0)&&(level==1))
+  {
+    sysconf_(_SC_LEVEL1_DCACHE_LINESIZE, cache_line);
+  }
+#endif
+#if defined _SC_LEVEL2_CACHE_LINESIZE
+  if((cache_line==0)&&(level==2))
+  {
+    sysconf_(_SC_LEVEL2_CACHE_LINESIZE, cache_line);
+  }
+#endif
+#if defined _SC_LEVEL3_CACHE_LINESIZE
+  if((cache_line==0)&&(level==3))
+  {
+    sysconf_(_SC_LEVEL3_CACHE_LINESIZE, cache_line);
+  }
+#endif
+#if defined HW_CACHELINE
+  (void)level; // any level
+  if(cache_line==0)
+  {
+    hw_sysctl_(HW_CACHELINE, cache_line);
+  }
+#endif
+  return cache_line;
+}
+
+} // namespace dim::cpu::impl_
 
 #if defined __linux__
 # include "cpu_detect_linux.hpp"
 #elif defined XX_WIN32 // FIXME: not implemented
 # include "cpu_detect_windows.hpp"
-#else
+#else // default empty topology
 namespace dim::cpu::impl_ {
-
-inline
-TopologyGroup
-detect_()
-{
-  return TopologyGroup{};
+  inline TopologyGroup detect_() { return TopologyGroup{}; }
 }
-
-} // namespace dim::cpu::impl_
 #endif
 
 namespace dim::cpu {
@@ -241,14 +456,72 @@ TopologyGroup
 detect()
 {
   auto root=impl_::detect_();
-  if(empty(root.cpus)) // fallback to flat topology
+  if(empty(root.cpus)) // fallback to hardcoded topology
   {
-    const auto cpu_count=std::max(1, int(std::thread::hardware_concurrency()));
-    for(auto cpu=0; cpu<cpu_count; ++cpu)
+    // assume each package has
+    // * a shared L3 cache
+    // * a dedicated L2 cache
+    // * a dedicated L1 cache
+    // * smt technology
+    const auto cpu_count=std::max(1, impl_::detect_cpu_count_());
+    int cache_size[3]={0}, cache_line[3]={0};
+    for(auto level=1; level<=3; ++level)
     {
-      auto &child=root.children.emplace_back(TopologyGroup{});
-      child.cpus.emplace_back(CpuId{cpu});
-      root.cpus.emplace_back(CpuId{cpu});
+      cache_size[level-1]=impl_::detect_cache_size_(level);
+      cache_line[level-1]=impl_::detect_cache_line_(level);
+    }
+#if defined __APPLE__
+    auto value=0;
+    impl_::sysctl_by_name_("hw.packages", value);
+    const auto pkg_count=std::max(1, value);
+    value=0;
+    impl_::sysctl_by_name_("machdep.cpu.core_count", value);
+    const auto core_count=std::max(1, value);
+    value=0;
+    impl_::sysctl_by_name_("machdep.cpu.thread_count", value);
+    const auto thread_count=std::max(1, value);
+    const auto smt_count=(thread_count+core_count-1)/core_count;
+#else
+    const auto pkg_count=1;
+    const auto smt_count=1;
+#endif
+    for(auto pkg=0; pkg< pkg_count; ++pkg)
+    {
+      auto &l3_grp=root.children.emplace_back(TopologyGroup{});
+      l3_grp.numa=NumaId{pkg};
+      l3_grp.cache_level=3;
+      l3_grp.cache_size=cache_size[2];
+      l3_grp.cache_line=cache_line[2];
+      const auto cpu_begin=cpu_count*pkg/pkg_count;
+      const auto cpu_end=std::min(cpu_count, cpu_count*(pkg+1)/pkg_count);
+      for(auto cpu=cpu_begin; cpu<cpu_end; ++cpu)
+      {
+        l3_grp.cpus.emplace_back(CpuId{cpu});
+        root.cpus.emplace_back(CpuId{cpu});
+      }
+      const auto pkg_core_count=(cpu_end-cpu_begin+smt_count-1)/smt_count;
+      for(auto core=0; core<pkg_core_count; ++core)
+      {
+        auto &l2_grp=l3_grp.children.emplace_back(TopologyGroup{});
+        l2_grp.cache_level=2;
+        l2_grp.cache_size=cache_size[1];
+        l2_grp.cache_line=cache_line[1];
+        auto &l1_grp=l2_grp.children.emplace_back(TopologyGroup{});
+        l1_grp.cache_level=1;
+        l1_grp.cache_size=cache_size[0];
+        l1_grp.cache_line=cache_line[0];
+        for(auto smt=0; smt<smt_count; ++smt)
+        {
+          const auto idx=core*smt_count+smt;
+          if(idx<int(size(l3_grp.cpus)))
+          {
+            l2_grp.cpus.emplace_back(l3_grp.cpus[idx]);
+            l1_grp.cpus.emplace_back(l3_grp.cpus[idx]);
+            auto &cpu_grp=l1_grp.children.emplace_back(TopologyGroup{});
+            cpu_grp.cpus.emplace_back(l3_grp.cpus[idx]);
+          }
+        }
+      }
     }
     // FIXME: detect other properties?
   }
@@ -256,7 +529,6 @@ detect()
 }
 
 } // namespace dim::cpu
-
 
 #endif // DIM_CPU_DETECT_HPP
 

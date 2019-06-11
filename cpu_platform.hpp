@@ -98,33 +98,39 @@ public:
     return root_;
   }
 
-  bool // success
+  void
   use_sys_cpu(const std::vector<CpuId> &used_cpus)
   {
     // collect paths of used cpu and global properties
-    max_cache_level_=0;
-    max_cache_line_=0;
-    auto numas=std::vector<NumaId>{};
     auto cpu_paths=std::vector<TopologyGroup::Path>{};
-    visit(root_,
-      [&](const auto &grp, const auto &path)
-      {
-        if(is_cpu(grp)&&(find_(used_cpus, grp.cpus.front())!=-1))
+    auto numas=std::vector<NumaId>{};
+    for(const auto *used=&used_cpus;
+        empty(cpu_paths); // if no cpu is avtually used
+        used=&root_.cpus) // then use all of them
+    {
+      max_cache_level_=0;
+      max_cache_line_=0;
+      numas.clear();
+      visit(root_,
+        [&](const auto &grp, const auto &path)
         {
-          for(const auto *pgrp: path)
+          if(is_cpu(grp)&&(find_(*used, grp.cpus.front())!=-1))
           {
-            max_cache_level_=std::max(max_cache_level_, pgrp->cache_level);
-            max_cache_line_=std::max(max_cache_line_, pgrp->cache_line);
-            const auto numa=pgrp->numa;
-            if(valid(numa)&&(find_(numas, numa)==-1))
+            for(const auto *pgrp: path)
             {
-              numas.emplace_back(numa);
+              max_cache_level_=std::max(max_cache_level_, pgrp->cache_level);
+              max_cache_line_=std::max(max_cache_line_, pgrp->cache_line);
+              const auto numa=pgrp->numa;
+              if(valid(numa)&&(find_(numas, numa)==-1))
+              {
+                numas.emplace_back(numa);
+              }
             }
+            cpu_paths.emplace_back(path);
           }
-          cpu_paths.emplace_back(path);
-        }
-        return true;
-      });
+          return true;
+        });
+    }
     if(!max_cache_line_)
     {
       max_cache_line_=64; // suitable assumed default for current hardware
@@ -211,10 +217,9 @@ public:
           pgrp=parent;
         });
     }
-  return true;
   }
 
-  bool
+  void
   filter_sys_cpu(const std::vector<CpuId> &cpus,
                  bool exclude=false)
   {
@@ -228,7 +233,7 @@ public:
         used_cpus.emplace_back(sys_id);
       }
     }
-    return use_sys_cpu(used_cpus);
+    use_sys_cpu(used_cpus);
   }
 
 private:
