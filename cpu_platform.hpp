@@ -8,180 +8,26 @@
 #include <utility>
 #include <memory>
 
-namespace dim {
+namespace dim::cpu {
 
-class CpuPlatform
+class Platform
 {
 public:
 
-  CpuPlatform()
-  : root_{}
-  , cpu_paths_{}
-  , numa_count_{}
-  , cpu_count_{}
+  Platform()
+  : root_{detect()}
   , max_cache_level_{}
   , max_cache_line_{}
-  , numa_sys_id_{}
-  , cpu_sys_id_{}
-  , numa_node_{}
-  , cache_size_{}
-  , cache_line_{}
-  , distance_{}
-  , proximity_{}
-  , roundtrip_{}
+  , numa_count_{}
+  , cpu_count_{}
+  , numas_{}
+  , cpus_{}
+  , numa_indices_{}
+  , distances_{}
+  , proximities_{}
+  , roundtrips_{}
   {
-    auto [root, online]=cpu_detect::detect();
-    root_=std::make_unique<cpu_detect::CpuGroup>(std::move(root));
-    max_cache_level_=0;
-    max_cache_line_=0;
-    auto numa_nodes=std::vector<int>{};
-    cpu_paths_.clear();
-    root_->visit([&](const auto &grp, const auto &path)
-    {
-      max_cache_level_=std::max(max_cache_level_, grp.cache_level);
-      max_cache_line_=std::max(max_cache_line_, grp.cache_line);
-      if(grp.numa_id!=-1)
-      {
-        numa_nodes.emplace_back(grp.numa_id);
-      }
-      if((size(grp.cpu_id)==1)&&empty(grp.children))
-      {
-        auto p=path;
-        p.emplace_back(&grp);
-        cpu_paths_.emplace_back(std::move(p));
-      }
-      return true;
-    });
-    if(!max_cache_line_)
-    {
-      max_cache_line_=64; // suitable assumed default for current hardware
-    }
-    if(empty(numa_nodes))
-    {
-      numa_nodes.emplace_back(-1); // at least one unknown node
-    }
-    numa_count_=int(size(numa_nodes));
-    numa_sys_id_=std::make_unique<int[]>(numa_count_);
-    std::copy(cbegin(numa_nodes), cend(numa_nodes), numa_sys_id_.get());
-    cpu_count_=int(size(cpu_paths_));
-    cpu_sys_id_=std::make_unique<int[]>(cpu_count_);
-    numa_node_=std::make_unique<int[]>(cpu_count_);
-    cache_size_=std::make_unique<std::unique_ptr<int[]>[]>(max_cache_level_);
-    cache_line_=std::make_unique<std::unique_ptr<int[]>[]>(max_cache_level_);
-    for(auto lvl=0; lvl<max_cache_level_; ++lvl)
-    {
-      cache_size_[lvl]=std::make_unique<int[]>(cpu_count_);
-      cache_line_[lvl]=std::make_unique<int[]>(cpu_count_);
-    }
-    for(auto cpu=0; cpu<cpu_count_; ++cpu)
-    {
-      const auto &path=cpu_paths_[cpu];
-      cpu_sys_id_[cpu]=path.back()->cpu_id[0];
-      numa_node_[cpu]=-1;
-      for(auto lvl=0; lvl<max_cache_level_; ++lvl)
-      {
-        cache_size_[lvl][cpu]=0;
-        cache_line_[lvl][cpu]=0;
-      }
-      for(const auto *grp: path)
-      {
-        const auto numa_id=grp->numa_id;
-        for(auto node=0; node<numa_count_; ++node)
-        {
-          if(numa_id==numa_sys_id_[node])
-          {
-            numa_node_[cpu]=node;
-          }
-        }
-        const auto cache_level=grp->cache_level;
-        if(cache_level>0)
-        {
-          cache_size_[cache_level-1][cpu]=grp->cache_size;
-          cache_line_[cache_level-1][cpu]=grp->cache_line;
-        }
-      }
-    }
-    auto max_distance=0;
-    distance_=std::make_unique<std::unique_ptr<int[]>[]>(cpu_count_);
-    for(auto cpu=0; cpu<cpu_count_; ++cpu)
-    {
-      const auto &path=cpu_paths_[cpu];
-      distance_[cpu]=std::make_unique<int[]>(cpu_count_);
-      for(auto other=0; other<cpu_count_; ++other)
-      {
-        const auto &opath=cpu_paths_[other];
-        const auto common=
-          std::mismatch(cbegin(path), cend(path), cbegin(opath));
-        const auto first_len=int(std::distance(common.first, cend(path)));
-        const auto second_len=int(std::distance(common.second, cend(opath)));
-        const auto numa_penalty=2*int(numa_node_[cpu]!=numa_node_[other]);
-        const auto distance=(first_len+second_len+numa_penalty+1)/2;
-        max_distance=std::max(max_distance, distance);
-        distance_[cpu][other]=distance;
-      }
-    }
-    proximity_=std::make_unique<std::unique_ptr<int[]>[]>(cpu_count_);
-    for(auto cpu=0; cpu<cpu_count_; ++cpu)
-    {
-      proximity_[cpu]=std::make_unique<int[]>(cpu_count_);
-      for(auto other=0; other<cpu_count_; ++other)
-      {
-        proximity_[cpu][other]=(2<<max_distance)-(1<<distance_[cpu][other]);
-      }
-    }
-    roundtrip_=std::make_unique<std::unique_ptr<int[]>[]>(cpu_count_);
-    for(auto cpu=0; cpu<cpu_count_; ++cpu)
-    {
-      const auto &path=cpu_paths_[cpu];
-      roundtrip_[cpu]=std::make_unique<int[]>(cpu_count_);
-      auto trip_count=0;
-      roundtrip_[cpu][trip_count++]=cpu;
-      const auto *grp=path.back();
-      std::for_each(crbegin(path)+1, crend(path),
-        [&](const auto *parent)
-        {
-          for(auto delta=0; delta<cpu_count_; ++delta)
-          {
-            const auto other=(delta+cpu)%cpu_count_;
-            const auto &opath=cpu_paths_[other];
-            if((std::find(cbegin(opath), cend(opath), parent)!=cend(opath))&&
-               (std::find(cbegin(opath), cend(opath), grp)==cend(opath)))
-            {
-              roundtrip_[cpu][trip_count++]=other;
-            }
-          }
-          grp=parent;
-        });
-    }
-    filter_sys_cpu(online);
-  }
-
-  int // number of cpu
-  cpu_count() const
-  {
-    return cpu_count_;
-  }
-
-  int // system id of cpu or -1 if unknown
-  cpu_sys_id(int cpu) const
-  {
-    return cpu_sys_id_[cpu];
-  }
-
-  int // cache size in bytes of cpu or 0 if unavailable
-  cache_size(int cpu,
-             int level) const
-  {
-    return ((level>0)&&(level<=max_cache_level_))
-           ? cache_size_[level-1][cpu] : 0;
-  }
-
-  int // cacheline size in bytes of cpu or 0 if unavailable
-  cache_line(int cpu,
-             int level) const
-  {
-    return ((level>0)&&(level<=max_cache_level_))
-           ? cache_line_[level-1][cpu] : 0;
+    use_sys_cpu(root_.cpus);
   }
 
   int // max cache level or 0 if unknown
@@ -196,159 +42,193 @@ public:
     return max_cache_line_;
   }
 
-  int // numa node of cpu
-  numa_node(int cpu) const
-  {
-    return numa_node_[cpu];
-  }
-
   int // number of numa nodes
   numa_count() const
   {
     return numa_count_;
   }
 
-  int // system id of numa node or -1 if unknown
-  numa_sys_id(int numa_node) const
+  NumaId // system id of numa node or -1 if unknown
+  numa_id(int numa_index) const
   {
-    return numa_sys_id_[numa_node];
+    return numas_[numa_index];
+  }
+
+  int // number of used cpu
+  cpu_count() const
+  {
+    return cpu_count_;
+  }
+
+  CpuId // system id of cpu or -1 if unknown
+  cpu_id(int cpu_index) const
+  {
+    return cpus_[cpu_index];
+  }
+
+  int // numa index of cpu
+  numa(int cpu_index) const
+  {
+    return numa_indices_[cpu_index];
   }
 
   int // cache distance from one cpu to another
-  distance(int cpu,
-           int other_cpu) const
+  distance(int cpu_index,
+           int other_cpu_index) const
   {
-    return distance_[cpu][other_cpu];
+    return distances_[cpu_index][other_cpu_index];
   }
 
   int // cache proximity from one cpu to another
-  proximity(int cpu,
-            int other_cpu) const
+  proximity(int cpu_index,
+            int other_cpu_index) const
   {
-    return proximity_[cpu][other_cpu];
+    return proximities_[cpu_index][other_cpu_index];
   }
 
   const int * // cache-aware roundtrip starting from cpu
-  roundtrip(int cpu) const
+  roundtrip(int cpu_index) const
   {
-    return roundtrip_[cpu].get();
+    return roundtrips_[cpu_index].get();
   }
 
-  const cpu_detect::CpuGroup &
+  const TopologyGroup &
   topology() const
   {
-    return *root_;
+    return root_;
   }
 
-  void
-  filter_sys_cpu(const std::vector<int> kept_sys_cpu)
+  bool // success
+  use_sys_cpu(const std::vector<CpuId> &used_cpus)
   {
-    auto next_cpu_count=0;
-    auto tr=std::vector<int>{};
-    for(auto cpu=0; cpu<cpu_count_; ++cpu)
-    {
-      tr.emplace_back((find_(kept_sys_cpu, cpu_sys_id_[cpu])==-1)
-                      ? -1 : next_cpu_count++);
-    }
-    if((next_cpu_count==0)||(next_cpu_count==cpu_count_))
-    {
-      return;
-    }
-    const auto translate=
-      [&](auto &previous)
+    // collect paths of used cpu and global properties
+    max_cache_level_=0;
+    max_cache_line_=0;
+    auto numas=std::vector<NumaId>{};
+    auto cpu_paths=std::vector<TopologyGroup::Path>{};
+    visit(root_,
+      [&](const auto &grp, const auto &path)
       {
-        using elem_t = std::decay_t<decltype(previous[0])>;
-        auto next=std::make_unique<elem_t[]>(next_cpu_count);
-        for(auto cpu=0; cpu<cpu_count_; ++cpu)
+        if(is_cpu(grp)&&(find_(used_cpus, grp.cpus.front())!=-1))
         {
-          if(auto next_cpu=tr[cpu]; next_cpu!=-1)
+          for(const auto *pgrp: path)
           {
-            next[next_cpu]=std::move(previous[cpu]);
-          }
-        }
-        previous=std::move(next);
-      };
-    translate(cpu_sys_id_);
-    translate(numa_node_);
-    for(auto lvl=0; lvl<max_cache_level_; ++lvl)
-    {
-      translate(cache_size_[lvl]);
-      translate(cache_line_[lvl]);
-    }
-    translate(distance_);
-    translate(proximity_);
-    translate(roundtrip_);
-    for(auto cpu=0; cpu<next_cpu_count; ++cpu)
-    {
-      translate(distance_[cpu]);
-      translate(proximity_[cpu]);
-      for(auto other=0, next=0; other<cpu_count_; ++other)
-      {
-        if(auto next_other=tr[roundtrip_[cpu][other]]; next_other!=-1)
-        {
-          roundtrip_[cpu][next++]=next_other;
-        }
-      }
-    }
-    cpu_count_=next_cpu_count;
-  }
-
-  void
-  filter_out_sys_cpu(const std::vector<int> excluded_sys_cpu)
-  {
-    auto kept_sys_cpu=std::vector<int>{};
-    for(auto cpu=0; cpu<cpu_count_; ++cpu)
-    {
-      const auto sys_id=cpu_sys_id_[cpu];
-      if(find_(excluded_sys_cpu, sys_id)==-1)
-      {
-        kept_sys_cpu.emplace_back(sys_id);
-      }
-    }
-    filter_sys_cpu(kept_sys_cpu);
-  }
-
-  std::vector<int>
-  first_sys_cpu_of_cache_level(int level) const
-  {
-    auto result=std::vector<int>{};
-    if((level>0)&&(level<=max_cache_level_))
-    {
-      for(const auto &path: cpu_paths_)
-      {
-        for(const auto *grp: path)
-        {
-          if(grp->cache_level==level)
-          {
-            if(&grp->first_leaf()==path.back())
+            max_cache_level_=std::max(max_cache_level_, pgrp->cache_level);
+            max_cache_line_=std::max(max_cache_line_, pgrp->cache_line);
+            const auto numa=pgrp->numa;
+            if(valid(numa)&&(find_(numas, numa)==-1))
             {
-              result.emplace_back(path.back()->cpu_id.front());
+              numas.emplace_back(numa);
             }
           }
+          cpu_paths.emplace_back(path);
         }
-      }
-    }
-    return result;
-  }
-
-  std::vector<int>
-  first_sys_cpu_of_sys_numa(int sys_numa) const
-  {
-    auto result=std::vector<int>{};
-    for(const auto &path: cpu_paths_)
+        return true;
+      });
+    if(!max_cache_line_)
     {
-      for(const auto *grp: path)
+      max_cache_line_=64; // suitable assumed default for current hardware
+    }
+    if(empty(numas))
+    {
+      numas.emplace_back(NumaId{}); // at least one unknown node
+    }
+    numa_count_=int(size(numas));
+    numas_=std::make_unique<NumaId[]>(numa_count_);
+    copy(cbegin(numas), cend(numas), numas_.get());
+    cpu_count_=int(size(cpu_paths));
+    // collect specific properties of each cpu
+    cpus_=std::make_unique<CpuId[]>(cpu_count_);
+    numa_indices_=std::make_unique<int[]>(cpu_count_);
+    for(auto cpu=0; cpu<cpu_count_; ++cpu)
+    {
+      const auto &path=cpu_paths[cpu];
+      cpus_[cpu]=path.back()->cpus.front();
+      numa_indices_[cpu]=-1;
+      for(const auto *pgrp: path)
       {
-        if(grp->numa_id==sys_numa)
+        const auto numa=pgrp->numa;
+        for(auto node=0; node<numa_count_; ++node)
         {
-          if(&grp->first_leaf()==path.back())
+          if(numa==numas_[node])
           {
-            result.emplace_back(path.back()->cpu_id.front());
+            numa_indices_[cpu]=node;
           }
         }
       }
     }
-    return result;
+    // compute distance, proximity and roudtrip
+    auto max_distance=0;
+    distances_=std::make_unique<std::unique_ptr<int[]>[]>(cpu_count_);
+    for(auto cpu=0; cpu<cpu_count_; ++cpu)
+    {
+      const auto &path=cpu_paths[cpu];
+      distances_[cpu]=std::make_unique<int[]>(cpu_count_);
+      for(auto other=0; other<cpu_count_; ++other)
+      {
+        const auto &opath=cpu_paths[other];
+        const auto common=mismatch(cbegin(path), cend(path), cbegin(opath));
+        const auto first_len=int(std::distance(common.first, cend(path)));
+        const auto second_len=int(std::distance(common.second, cend(opath)));
+        const auto numa_penalty=
+          2*int(numa_indices_[cpu]!=numa_indices_[other]);
+        const auto distance=(first_len+second_len+numa_penalty+1)/2;
+        max_distance=std::max(max_distance, distance);
+        distances_[cpu][other]=distance;
+      }
+    }
+    proximities_=std::make_unique<std::unique_ptr<int[]>[]>(cpu_count_);
+    for(auto cpu=0; cpu<cpu_count_; ++cpu)
+    {
+      proximities_[cpu]=std::make_unique<int[]>(cpu_count_);
+      for(auto other=0; other<cpu_count_; ++other)
+      {
+        proximities_[cpu][other]=(2<<max_distance)-
+                                 (1<<distances_[cpu][other]);
+      }
+    }
+    roundtrips_=std::make_unique<std::unique_ptr<int[]>[]>(cpu_count_);
+    for(auto cpu=0; cpu<cpu_count_; ++cpu)
+    {
+      const auto &path=cpu_paths[cpu];
+      roundtrips_[cpu]=std::make_unique<int[]>(cpu_count_);
+      auto trip_count=0;
+      roundtrips_[cpu][trip_count++]=cpu;
+      const auto *pgrp=path.back();
+      for_each(crbegin(path)+1, crend(path),
+        [&](const auto *parent)
+        {
+          for(auto delta=0; delta<cpu_count_; ++delta)
+          {
+            const auto other=(delta+cpu)%cpu_count_;
+            const auto &opath=cpu_paths[other];
+            if((find(cbegin(opath), cend(opath), parent)!=cend(opath))&&
+               (find(cbegin(opath), cend(opath), pgrp)==cend(opath)))
+            {
+              roundtrips_[cpu][trip_count++]=other;
+            }
+          }
+          pgrp=parent;
+        });
+    }
+  return true;
+  }
+
+  bool
+  filter_sys_cpu(const std::vector<CpuId> &cpus,
+                 bool exclude=false)
+  {
+    auto used_cpus=std::vector<CpuId>{};
+    for(auto cpu=0; cpu<cpu_count_; ++cpu)
+    {
+      const auto sys_id=cpus_[cpu];
+      const auto found=(find_(cpus, sys_id)!=-1);
+      if(found!=exclude)
+      {
+        used_cpus.emplace_back(sys_id);
+      }
+    }
+    return use_sys_cpu(used_cpus);
   }
 
 private:
@@ -374,30 +254,85 @@ private:
     return find_(data(values), int(size(values)), value);
   }
 
-  // address of root group is taken in cpu_paths_, thus in case of
-  // move-copy/assign this address must not change, thats why this
-  // root group is stored in a unique_ptr
-  std::unique_ptr<cpu_detect::CpuGroup> root_;
-  std::vector<std::vector<const cpu_detect::CpuGroup *>> cpu_paths_;
-  int numa_count_;
-  int cpu_count_;
+  TopologyGroup root_;
   int max_cache_level_;
   int max_cache_line_;
-  std::unique_ptr<int[]> numa_sys_id_;
-  std::unique_ptr<int[]> cpu_sys_id_;
-  std::unique_ptr<int[]> numa_node_;
-  std::unique_ptr<std::unique_ptr<int[]>[]> cache_size_;
-  std::unique_ptr<std::unique_ptr<int[]>[]> cache_line_;
-  std::unique_ptr<std::unique_ptr<int[]>[]> distance_;
-  std::unique_ptr<std::unique_ptr<int[]>[]> proximity_;
-  std::unique_ptr<std::unique_ptr<int[]>[]> roundtrip_;
+  int numa_count_;
+  int cpu_count_;
+  std::unique_ptr<NumaId[]> numas_;
+  std::unique_ptr<CpuId[]> cpus_;
+  std::unique_ptr<int[]> numa_indices_;
+  std::unique_ptr<std::unique_ptr<int[]>[]> distances_;
+  std::unique_ptr<std::unique_ptr<int[]>[]> proximities_;
+  std::unique_ptr<std::unique_ptr<int[]>[]> roundtrips_;
 };
 
+inline
+int // index of used cpu or -1 if not found
+find_index_from_sys_id(const Platform &p,
+                       CpuId cpu)
+{
+  for(auto index=0; index<p.cpu_count(); ++index)
+  {
+    if(p.cpu_id(index)==cpu)
+    {
+      return index;
+    }
+  }
+  return -1;
+}
+
+inline
+int // index of used numa node or -1 if not found
+find_index_from_sys_id(const Platform &p,
+                       NumaId numa)
+{
+  for(auto index=0; index<p.numa_count(); ++index)
+  {
+    if(p.numa_id(index)==numa)
+    {
+      return index;
+    }
+  }
+  return -1;
+}
+
+inline
+void
+disable_smt(Platform &p)
+{
+  p.filter_sys_cpu(collect_indexth_cpu_of_cache_level(p.topology(), 0, 1));
+}
+
+inline
+int // cache size divided by number of cpus in shared cache
+compute_partial_cache_size(const Platform &p,
+                           int cpu_index,
+                           int level)
+{
+  const auto *found=
+    find_cache(p.topology(), p.cpu_id(cpu_index), level);
+  if(!found)
+  {
+    return -1;
+  }
+  auto count=0;
+  for(const auto &id: found->cpus)
+  {
+    if(find_index_from_sys_id(p, id)!=-1)
+    {
+      ++count;
+    }
+  }
+  return found->cache_size/count;
+}
+
+inline
 std::string
-to_string(const CpuPlatform &p)
+to_string(const Platform &p)
 {
   auto txt=std::string{};
-  auto show_values=
+  const auto show_values=
     [&](const auto &title, const auto &count, const auto &fnct)
     {
       txt+=title;
@@ -409,7 +344,7 @@ to_string(const CpuPlatform &p)
       }
       txt+='\n';
     };
-  auto show_values_2=
+  const auto show_values_2=
     [&](const auto &title, const auto &low, const auto &high,
         const auto &count, const auto &fnct)
     {
@@ -427,44 +362,36 @@ to_string(const CpuPlatform &p)
         txt+='\n';
       }
     };
-  show_values("numa_sys_id", p.numa_count(),
-    [&](const auto &numa)
-    {
-      return p.numa_sys_id(numa);
-    });
-  show_values("cpu_sys_id", p.cpu_count(),
-    [&](const auto &cpu)
-    {
-      return p.cpu_sys_id(cpu);
-    });
-  show_values("numa_node", p.cpu_count(),
-    [&](const auto &cpu)
-    {
-      return p.numa_node(cpu);
-    });
   txt+="max_cache_level: "+std::to_string(p.max_cache_level())+'\n';
   txt+="max_cache_line: "+std::to_string(p.max_cache_line())+'\n';
-  show_values_2("cache_size", 1, p.max_cache_level()+1, p.cpu_count(),
-    [&](const auto &lvl, const auto &cpu)
+  txt+="numa_count: "+std::to_string(p.numa_count())+'\n';
+  txt+="cpu_count: "+std::to_string(p.cpu_count())+'\n';
+  show_values("numa_sys_ids", p.numa_count(),
+    [&](const auto &numa)
     {
-      return p.cache_size(cpu, lvl);
+      return p.numa_id(numa).id;
     });
-  show_values_2("cache_line", 1, p.max_cache_level()+1, p.cpu_count(),
-    [&](const auto &lvl, const auto &cpu)
+  show_values("cpu_sys_ids", p.cpu_count(),
+    [&](const auto &cpu)
     {
-      return p.cache_line(cpu, lvl);
+      return p.cpu_id(cpu).id;
     });
-  show_values_2("distance", 0, p.cpu_count(), p.cpu_count(),
+  show_values("numas", p.cpu_count(),
+    [&](const auto &cpu)
+    {
+      return p.numa(cpu);
+    });
+  show_values_2("distances", 0, p.cpu_count(), p.cpu_count(),
     [&](const auto &cpu, const auto &other)
     {
       return p.distance(cpu, other);
     });
-  show_values_2("proximity", 0, p.cpu_count(), p.cpu_count(),
+  show_values_2("proximities", 0, p.cpu_count(), p.cpu_count(),
     [&](const auto &cpu, const auto &other)
     {
       return p.proximity(cpu, other);
     });
-  show_values_2("roundtrip", 0, p.cpu_count(), p.cpu_count(),
+  show_values_2("roundtrips", 0, p.cpu_count(), p.cpu_count(),
     [&](const auto &cpu, const auto &other)
     {
       return p.roundtrip(cpu)[other];
@@ -472,14 +399,15 @@ to_string(const CpuPlatform &p)
   return txt;
 }
 
+inline
 std::ostream &
 operator<<(std::ostream &output,
-           const CpuPlatform &p)
+           const Platform &p)
 {
   return output << to_string(p);
 }
 
-} // namespace dim
+} // namespace dim::cpu
 
 #endif // DIM_CPU_PLATFORM_HPP
 

@@ -7,9 +7,8 @@
 
 #include <fstream>
 #include <cctype>
-#include <algorithm>
 
-namespace dim::cpu_detect::impl_ {
+namespace dim::cpu::impl_ {
 
 inline
 std::string
@@ -27,9 +26,9 @@ first_line_(const std::string &path)
         {
           return !std::isspace(c);
         };
-      const auto b=std::find_if(cbegin(line), cend(line), not_space);
-      const auto e=std::find_if(crbegin(line), crend(line), not_space);
-      std::for_each(b, e.base(),
+      const auto b=find_if(cbegin(line), cend(line), not_space);
+      const auto e=find_if(crbegin(line), crend(line), not_space);
+      for_each(b, e.base(),
         [&](const auto & c)
         {
           result+=char(std::tolower(c));
@@ -39,22 +38,29 @@ first_line_(const std::string &path)
   return result;
 }
 
+template<typename SysId>
 inline
-std::vector<int>
-read_list_(const std::string &path)
+std::vector<SysId>
+read_list_(const std::string &path,
+           const std::vector<SysId> &filter={})
 {
-  auto result=std::vector<int>{};
+  auto result=std::vector<SysId>{};
   const auto line=first_line_(path);
   for(auto b=cbegin(line), e=b;
-      (e=std::find(b, cend(line), ','))!=b;
+      (e=find(b, cend(line), ','))!=b;
       b=(e!=cend(line)) ? e+1 : e)
   {
-    const auto dash=std::find(b, e, '-');
+    const auto dash=find(b, e, '-');
     const auto first=std::stoi(std::string{b, dash});
     const auto last=(dash==e) ? first : std::stoi(std::string{dash+1, e});
-    for(auto id=first; id<=last; ++id)
+    for(auto i=first; i<=last; ++i)
     {
-      result.emplace_back(id);
+      const auto id=SysId{i};
+      if(empty(filter)||
+         (find(cbegin(filter), cend(filter), id)!=cend(filter)))
+      {
+        result.emplace_back(id);
+      }
     }
   }
   return result;
@@ -92,11 +98,11 @@ read_int_(const std::string &path)
 template<typename CacheFnct>
 inline
 void
-iterate_cache_(int cpu_id,
+iterate_cache_(CpuId cpu,
                CacheFnct fnct)
 {
   const auto cpu_path=
-    "/sys/devices/system/cpu/cpu"+std::to_string(cpu_id);
+    "/sys/devices/system/cpu/cpu"+std::to_string(cpu.id);
   for(auto idx=0; ; ++idx)
   {
     const auto cache_path=cpu_path+"/cache/index"+std::to_string(idx);
@@ -114,18 +120,18 @@ iterate_cache_(int cpu_id,
 
 inline
 void
-collect_next_level_(CpuGroup &grp)
+collect_next_level_(TopologyGroup &grp)
 {
-  for(const auto &cpu_id: grp.cpu_id)
+  for(const auto &cpu: grp.cpus)
   {
     if(grp.cache_level<=1)
     {
-      auto &child=grp.children.emplace_back(CpuGroup{});
-      child.cpu_id.emplace_back(cpu_id);
+      auto &child=grp.children.emplace_back(TopologyGroup{});
+      child.cpus.emplace_back(cpu);
     }
     else
     {
-      iterate_cache_(cpu_id,
+      iterate_cache_(cpu,
         [&](const auto &cache_path, const auto &cache_level)
         {
           auto cache_size=read_int_(cache_path+"/size");
@@ -137,20 +143,21 @@ collect_next_level_(CpuGroup &grp)
           }
           if(cache_level==grp.cache_level-1)
           {
-            auto cpu_list=read_list_(cache_path+"/shared_cpu_list");
-            auto found=std::find_if(
+            auto cpu_list=read_list_(cache_path+"/shared_cpu_list",
+                                     grp.cpus);
+            auto found=find_if(
               cbegin(grp.children), cend(grp.children),
               [&](const auto &child)
               {
-                return child.cpu_id==cpu_list;
+                return child.cpus==cpu_list;
               });
             if(found==cend(grp.children))
             {
-              auto &child=grp.children.emplace_back(CpuGroup{});
+              auto &child=grp.children.emplace_back(TopologyGroup{});
               child.cache_level=cache_level;
               child.cache_size=cache_size;
               child.cache_line=cache_line;
-              child.cpu_id=cpu_list;
+              child.cpus=std::move(cpu_list);
               collect_next_level_(child);
             }
           }
@@ -160,36 +167,35 @@ collect_next_level_(CpuGroup &grp)
 }
 
 inline
-std::tuple<CpuGroup,
-           std::vector<int>>
+TopologyGroup
 detect_()
 {
-  auto grp=CpuGroup{};
-  grp.cpu_id=read_list_("/sys/devices/system/cpu/possible");
+  auto root=TopologyGroup{};
+  root.cpus=read_list_<CpuId>("/sys/devices/system/cpu/online");
   auto max_cache_level=-1;
-  for(const auto &cpu_id: grp.cpu_id)
+  for(const auto &cpu: root.cpus)
   {
-    iterate_cache_(cpu_id,
+    iterate_cache_(cpu,
       [&](const auto &cache_path, const auto &cache_level)
       {
         (void)cache_path;
         max_cache_level=std::max(max_cache_level, cache_level);
       });
   }
-  for(const auto &numa_id: read_list_("/sys/devices/system/node/possible"))
+  for(const auto &numa: read_list_<NumaId>("/sys/devices/system/node/online"))
   {
     const auto numa_path=
-      "/sys/devices/system/node/node"+std::to_string(numa_id);
-    auto &child=grp.children.emplace_back(CpuGroup{});
-    child.numa_id=numa_id;
+      "/sys/devices/system/node/node"+std::to_string(numa.id);
+    auto &child=root.children.emplace_back(TopologyGroup{});
+    child.numa=numa;
     child.cache_level=max_cache_level;
-    child.cpu_id=read_list_(numa_path+"/cpulist");
+    child.cpus=read_list_(numa_path+"/cpulist", root.cpus);
     collect_next_level_(child);
   }
-  return {std::move(grp), read_list_("/sys/devices/system/cpu/online")};
+  return root;
 }
 
-} // namespace dim::cpu_detect::impl_
+} // namespace dim::cpu::impl_
 
 #endif // DIM_CPU_DETECT_LINUX_HPP
 

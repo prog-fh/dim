@@ -5,74 +5,184 @@
 
 #include <vector>
 #include <string>
+#include <algorithm>
 #include <iostream>
 #include <thread>
-#include <tuple>
 
-namespace dim::cpu_detect {
+namespace dim::cpu {
 
-struct CpuGroup
+namespace impl_ {
+
+template<typename Tag>
+struct SysId
 {
-  int numa_id{-1};
+  using tag_t = Tag;
+  int id{-1};
+};
+
+template<typename Tag>
+inline
+bool
+valid(SysId<Tag> sys)
+{
+  return sys.id!=-1;
+}
+
+template<typename Tag>
+inline
+bool
+operator==(SysId<Tag> lhs,
+           SysId<Tag> rhs)
+{
+  return lhs.id==rhs.id;
+}
+
+template<typename Tag>
+inline
+bool
+operator!=(SysId<Tag> lhs,
+           SysId<Tag> rhs)
+{
+  return !(lhs==rhs);
+}
+
+} // namespace impl_
+
+using NumaId = impl_::SysId<struct NumaIdTag>;
+using CpuId = impl_::SysId<struct CpuIdTag>;
+
+struct TopologyGroup
+{
+  NumaId numa{};
   int cache_level{-1};
   int cache_size{-1};
   int cache_line{-1};
-  std::vector<int> cpu_id{};
-  std::vector<CpuGroup> children{};
+  std::vector<CpuId> cpus{};
+  std::vector<TopologyGroup> children{};
+  using Path = std::vector<const TopologyGroup *>;
+};
 
-  template<typename Fnct>
-  bool
-  visit(Fnct fnct) const
+namespace impl_ {
+
+template<typename Fnct>
+inline
+bool
+visit_(TopologyGroup::Path &path,
+       Fnct fnct)
+{
+  const auto &const_path=path;
+  if(!fnct(*const_path.back(), const_path))
   {
-    auto path=std::vector<const CpuGroup *>{};
-    return visit_(path, fnct);
+    return false;
   }
-
-  const CpuGroup &
-  first_leaf() const
+  for(const auto &child: path.back()->children)
   {
-    return empty(children) ? *this : children.front().first_leaf();
-  }
-
-  const CpuGroup &
-  last_leaf() const
-  {
-    return empty(children) ? *this : children.back().last_leaf();
-  }
-
-private:
-
-  template<typename Fnct>
-  bool
-  visit_(std::vector<const CpuGroup *> &path,
-         Fnct fnct) const
-  {
-    const auto &const_path=path;
-    if(!fnct(*this, const_path))
+    path.emplace_back(&child);
+    if(!visit_(path, fnct))
     {
       return false;
     }
-    path.emplace_back(this);
-    for(const auto &child: children)
+    path.pop_back();
+  }
+  return true;
+}
+
+} // namespace impl_
+
+inline
+bool
+is_cpu(const TopologyGroup &grp)
+{
+  return empty(grp.children)&&(size(grp.cpus)==1);
+}
+
+inline
+bool
+contains(const TopologyGroup &grp,
+         CpuId cpu)
+{
+  return find(cbegin(grp.cpus), end(grp.cpus), cpu)!=cend(grp.cpus);
+}
+
+template<typename Fnct>
+inline
+bool
+visit(const TopologyGroup &root,
+      Fnct fnct)
+{
+  auto path=TopologyGroup::Path{&root};
+  return impl_::visit_(path, fnct);
+}
+
+template<typename Cond>
+inline
+const TopologyGroup *
+find(const TopologyGroup &root,
+     Cond cond)
+{
+  const TopologyGroup *result=nullptr;
+  visit(root,
+    [&](const auto &grp, const auto &path)
     {
-      if(!child.visit_(path, fnct))
+      if(cond(grp, path))
       {
+        result=&grp;
         return false;
       }
+      return true;
+    });
+  return result;
+}
+
+inline
+const TopologyGroup *
+find_cache(const TopologyGroup &root,
+           CpuId cpu,
+           int level)
+{
+  return find(root,
+    [&](const auto &grp, const auto &)
+    {
+      return (grp.cache_level==level)&&contains(grp, cpu);
+    });
+}
+
+inline
+std::vector<CpuId>
+collect_indexth_cpu_of_cache_level(const TopologyGroup &root,
+                                   int index,
+                                   int level)
+{
+  auto result=std::vector<CpuId>{};
+  for(const auto &cpu: root.cpus)
+  {
+    if(const auto *cache=find_cache(root, cpu, level))
+    {
+      auto count=(index<0) ? int(size(cache->cpus))+index : index;
+      visit(*cache,
+        [&](const auto &grp, const auto &)
+        {
+          if(is_cpu(grp)&&(count--==0))
+          {
+            result.emplace_back(grp.cpus.front());
+            return false;
+          }
+          return true;
+        });
     }
-    path.pop_back();
-    return true;
   }
-};
+  return result;
+}
 
 inline
 std::string
-to_string(const CpuGroup &grp)
+to_string(const TopologyGroup &grp)
 {
   auto txt=std::string{};
-  grp.visit([&](const auto &grp, const auto &path)
+  visit(grp,
+    [&](const auto &grp, const auto &path)
     {
-      txt+=std::string(2*size(path), ' ')+'*';
+      txt+=std::string(2*(size(path)-1), ' ')+'*';
       if(empty(path))
       {
         txt+=" HOST";
@@ -83,13 +193,13 @@ to_string(const CpuGroup &grp)
              '('+std::to_string(grp.cache_size)+
              '/'+std::to_string(grp.cache_line)+')';
       }
-      if(grp.numa_id!=-1)
+      if(valid(grp.numa))
       {
-        txt+=" numa_id("+std::to_string(grp.numa_id)+')';
+        txt+=" numa_id("+std::to_string(grp.numa.id)+')';
       }
-      if((size(grp.cpu_id)==1)&&empty(grp.children))
+      if((size(grp.cpus)==1)&&empty(grp.children))
       {
-        txt+=" cpu_id("+std::to_string(grp.cpu_id[0])+')';
+        txt+=" cpu_id("+std::to_string(grp.cpus.front().id)+')';
       }
       txt+='\n';
       return true;
@@ -100,54 +210,52 @@ to_string(const CpuGroup &grp)
 inline
 std::ostream &
 operator<<(std::ostream &output,
-           const CpuGroup &grp)
+           const TopologyGroup &grp)
 {
   return output << to_string(grp);
 }
 
-} // namespace dim::cpu_detect
+} // namespace dim::cpu
 
 #if defined __linux__
 # include "cpu_detect_linux.hpp"
 #elif defined XX_WIN32 // FIXME: not implemented
 # include "cpu_detect_windows.hpp"
 #else
-namespace dim::cpu_detect::impl_ {
+namespace dim::cpu::impl_ {
 
 inline
-std::tuple<CpuGroup,
-           std::vector<int>>
+TopologyGroup
 detect_()
 {
-  return {CpuGroup{}, std::vector<int>{}};
+  return TopologyGroup{};
 }
 
-} // namespace dim::cpu_detect::impl_
+} // namespace dim::cpu::impl_
 #endif
 
-namespace dim::cpu_detect {
+namespace dim::cpu {
 
 inline
-std::tuple<CpuGroup,
-           std::vector<int>>
+TopologyGroup
 detect()
 {
-  auto [root, online]=impl_::detect_();
-  if(empty(root.cpu_id)) // fallback to flat topology
+  auto root=impl_::detect_();
+  if(empty(root.cpus)) // fallback to flat topology
   {
     const auto cpu_count=std::max(1, int(std::thread::hardware_concurrency()));
     for(auto cpu=0; cpu<cpu_count; ++cpu)
     {
-      auto &child=root.children.emplace_back(CpuGroup{});
-      child.cpu_id.emplace_back(cpu);
-      root.cpu_id.emplace_back(cpu);
+      auto &child=root.children.emplace_back(TopologyGroup{});
+      child.cpus.emplace_back(CpuId{cpu});
+      root.cpus.emplace_back(CpuId{cpu});
     }
     // FIXME: detect other properties?
   }
-  return {std::move(root), std::move(online)};
+  return root;
 }
 
-} // namespace dim::cpu_detect
+} // namespace dim::cpu
 
 
 #endif // DIM_CPU_DETECT_HPP
