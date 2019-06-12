@@ -105,7 +105,7 @@ public:
     auto cpu_paths=std::vector<TopologyGroup::Path>{};
     auto numas=std::vector<NumaId>{};
     for(const auto *used=&used_cpus;
-        empty(cpu_paths); // if no cpu is avtually used
+        empty(cpu_paths); // if no cpu is actually used
         used=&root_.cpus) // then use all of them
     {
       max_cache_level_=0;

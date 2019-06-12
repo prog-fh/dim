@@ -38,13 +38,13 @@ first_line_(const std::string &path)
   return result;
 }
 
-template<typename SysId>
+template<typename SysIdType>
 inline
-std::vector<SysId>
+std::vector<SysIdType>
 read_list_(const std::string &path,
-           const std::vector<SysId> &filter={})
+           const std::vector<SysIdType> &filter={})
 {
-  auto result=std::vector<SysId>{};
+  auto result=std::vector<SysIdType>{};
   const auto line=first_line_(path);
   for(auto b=cbegin(line), e=b;
       (e=find(b, cend(line), ','))!=b;
@@ -55,7 +55,7 @@ read_list_(const std::string &path,
     const auto last=(dash==e) ? first : std::stoi(std::string{dash+1, e});
     for(auto i=first; i<=last; ++i)
     {
-      const auto id=SysId{i};
+      const auto id=SysIdType{i};
       if(empty(filter)||
          (find(cbegin(filter), cend(filter), id)!=cend(filter)))
       {
@@ -141,7 +141,7 @@ collect_next_level_(TopologyGroup &grp)
             grp.cache_size=cache_size;
             grp.cache_line=cache_line;
           }
-          if(cache_level==grp.cache_level-1)
+          else if(cache_level==grp.cache_level-1)
           {
             auto cpu_list=read_list_(cache_path+"/shared_cpu_list",
                                      grp.cpus);
@@ -172,25 +172,80 @@ detect_()
 {
   auto root=TopologyGroup{};
   root.cpus=read_list_<CpuId>("/sys/devices/system/cpu/online");
-  auto max_cache_level=-1;
-  for(const auto &cpu: root.cpus)
+  const auto online_numas=
+    read_list_<NumaId>("/sys/devices/system/node/online");
+  if(!empty(online_numas))
   {
-    iterate_cache_(cpu,
-      [&](const auto &cache_path, const auto &cache_level)
-      {
-        (void)cache_path;
-        max_cache_level=std::max(max_cache_level, cache_level);
-      });
+    auto max_cache_level=0;
+    for(const auto &cpu: root.cpus)
+    {
+      iterate_cache_(cpu,
+        [&](const auto &cache_path, const auto &cache_level)
+        {
+          (void)cache_path;
+          max_cache_level=std::max(max_cache_level, cache_level);
+        });
+    }
+    for(const auto &numa: online_numas)
+    {
+      const auto numa_path=
+        "/sys/devices/system/node/node"+std::to_string(numa.id);
+      auto &child=root.children.emplace_back(TopologyGroup{});
+      child.numa=numa;
+      child.cpus=read_list_(numa_path+"/cpulist", root.cpus);
+      child.cache_level=max_cache_level;
+      collect_next_level_(child);
+    }
   }
-  for(const auto &numa: read_list_<NumaId>("/sys/devices/system/node/online"))
+  else // probably Windows-Subsystem-for-Linux
   {
-    const auto numa_path=
-      "/sys/devices/system/node/node"+std::to_string(numa.id);
-    auto &child=root.children.emplace_back(TopologyGroup{});
-    child.numa=numa;
-    child.cache_level=max_cache_level;
-    child.cpus=read_list_(numa_path+"/cpulist", root.cpus);
-    collect_next_level_(child);
+    for(const auto &cpu: root.cpus)
+    {
+      const auto pkg=read_int_("/sys/devices/system/cpu/cpu"+
+                               std::to_string(cpu.id)+
+                               "/topology/physical_package_id");
+      const auto it=find_if(begin(root.children), end(root.children),
+        [&](const auto &grp)
+        {
+          return grp.numa.id==pkg;
+        });
+      auto &l3_grp=(it!=end(root.children)) ? *it
+                   : root.children.emplace_back(TopologyGroup{});
+      l3_grp.numa=NumaId{pkg}; // dummy numa node from package id
+      l3_grp.cpus.emplace_back(cpu);
+    }
+    for(auto &l3_grp: root.children)
+    {
+      l3_grp.cache_level=3; // hardcoded
+      for(const auto &cpu: l3_grp.cpus)
+      {
+        const auto core=read_int_("/sys/devices/system/cpu/cpu"+
+                                  std::to_string(cpu.id)+
+                                  "/topology/core_id");
+        const auto it=find_if(begin(l3_grp.children), end(l3_grp.children),
+          [&](const auto &grp)
+          {
+            return grp.numa==NumaId{core}; // temporary
+          });
+        auto &l2_grp=(it!=end(l3_grp.children)) ? *it
+                     : l3_grp.children.emplace_back(TopologyGroup{});
+        l2_grp.numa=NumaId{core}; // temporary
+        l2_grp.cpus.emplace_back(cpu);
+      }
+      for(auto &l2_grp: l3_grp.children)
+      {
+        l2_grp.numa=NumaId{}; // reset temporary
+        l2_grp.cache_level=2; // hardcoded
+        auto &l1_grp=l2_grp.children.emplace_back(TopologyGroup{});
+        l1_grp.cache_level=1; // hardcoded
+        l1_grp.cpus=l2_grp.cpus;
+        for(const auto &cpu: l1_grp.cpus)
+        {
+          auto &cpu_grp=l1_grp.children.emplace_back(TopologyGroup{});
+          cpu_grp.cpus.emplace_back(cpu);
+        }
+      }
+    }
   }
   return root;
 }

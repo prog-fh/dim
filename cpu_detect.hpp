@@ -3,16 +3,29 @@
 #ifndef DIM_CPU_DETECT_HPP
 #define DIM_CPU_DETECT_HPP 1
 
-#include <vector>
-#include <string>
-#include <algorithm>
-#include <iostream>
-#include <thread>
+#if defined _WIN32
+# if !defined _WIN32_WINNT
+#   define _WIN32_WINNT _WIN32_WINNT_WIN7
+# endif
+# if !defined WINVER
+#   define WINVER _WIN32_WINNT
+# endif
+# include <windows.h>
+#else
+# include <sys/sysctl.h>
+# include <unistd.h>
+#endif
 
 #if defined __APPLE__
 # include <mach/mach.h>
 # include <mach/thread_policy.h>
 #endif
+
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <iostream>
+#include <thread>
 
 namespace dim::cpu {
 
@@ -59,9 +72,9 @@ using CpuId = impl_::SysId<struct CpuIdTag>;
 struct TopologyGroup
 {
   NumaId numa{};
-  int cache_level{-1};
-  int cache_size{-1};
-  int cache_line{-1};
+  int cache_level{};
+  int cache_size{};
+  int cache_line{};
   std::vector<CpuId> cpus{};
   std::vector<TopologyGroup> children{};
   using Path = std::vector<const TopologyGroup *>;
@@ -192,7 +205,7 @@ to_string(const TopologyGroup &grp)
       {
         txt+=" HOST";
       }
-      if(grp.cache_level!=-1)
+      if(grp.cache_level>0)
       {
         txt+=" L"+std::to_string(grp.cache_level)+
              '('+std::to_string(grp.cache_size)+
@@ -236,15 +249,15 @@ bind_current_thread(CpuId cpu)
     }
 #elif defined _WIN32
     GROUP_AFFINITY aff;
-    memset(&aff,0,sizeof(aff));
-    aff.Mask=1ULL<<(cpu.id&0x0000003F);
-    aff.Group=cpu.id>>6;
-    if(::SetThreadGroupAffinity(::GetCurrentThread(), &aff, nullptr)!=0)
+    std::memset(&aff, 0, sizeof(aff));
+    aff.Mask=1ULL<<(cpu.id&63);
+    aff.Group=WORD(cpu.id>>6);
+    if(::SetThreadGroupAffinity(::GetCurrentThread(), &aff, nullptr))
     {
       return true;
     }
 #elif defined __APPLE__
-    // FIXME: under MacOsX, affinity does not mean attachment to a specific CPU
+    // FIXME: under MacOsX, affinity does not mean binding to a specific CPU!
     thread_affinity_policy_data_t policy;
     policy.affinity_tag=cpu.id;
     if(::thread_policy_set(::pthread_mach_thread_np(::pthread_self()),
@@ -259,12 +272,7 @@ bind_current_thread(CpuId cpu)
   return false;
 }
 
-} // namespace dim::cpu
-
-#include <sys/sysctl.h>
-#include <unistd.h>
-
-namespace dim::cpu::impl_ {
+namespace impl_ {
 
 #if defined CTL_HW
   template<typename T>
@@ -311,26 +319,28 @@ namespace dim::cpu::impl_ {
   }
 #endif
 
-template<typename T>
-inline
-bool // success
-sysconf_(int name,
-         T &result)
-{
-  for(;;)
+#if !defined _WIN32
+  template<typename T>
+  inline
+  bool // success
+  sysconf_(int name,
+           T &result)
   {
-    const auto r=::sysconf(name);
-    if(r>=0)
+    for(;;)
     {
-      result=static_cast<T>(r);
-      return true;
-    }
-    if(errno!=EINTR)
-    {
-      return false;
+      const auto r=::sysconf(name);
+      if(r>=0)
+      {
+        result=static_cast<T>(r);
+        return true;
+      }
+      if(errno!=EINTR)
+      {
+        return false;
+      }
     }
   }
-}
+#endif
 
 inline
 int // detected cpu count or 0 if unknown
@@ -401,6 +411,7 @@ detect_cache_size_(int level)
     hw_sysctl_(HW_L3CACHESIZE, cache_size);
   }
 #endif
+  (void)level;
   return cache_size;
 }
 
@@ -428,20 +439,22 @@ detect_cache_line_(int level)
   }
 #endif
 #if defined HW_CACHELINE
-  (void)level; // any level
-  if(cache_line==0)
+  if(cache_line==0) // any level
   {
     hw_sysctl_(HW_CACHELINE, cache_line);
   }
 #endif
+  (void)level;
   return cache_line;
 }
 
-} // namespace dim::cpu::impl_
+} // namespace impl_
+
+} // namespace dim::cpu
 
 #if defined __linux__
 # include "cpu_detect_linux.hpp"
-#elif defined XX_WIN32 // FIXME: not implemented
+#elif defined _WIN32
 # include "cpu_detect_windows.hpp"
 #else // default empty topology
 namespace dim::cpu::impl_ {
@@ -458,18 +471,7 @@ detect()
   auto root=impl_::detect_();
   if(empty(root.cpus)) // fallback to hardcoded topology
   {
-    // assume each package has
-    // * a shared L3 cache
-    // * a dedicated L2 cache
-    // * a dedicated L1 cache
-    // * smt technology
     const auto cpu_count=std::max(1, impl_::detect_cpu_count_());
-    int cache_size[3]={0}, cache_line[3]={0};
-    for(auto level=1; level<=3; ++level)
-    {
-      cache_size[level-1]=impl_::detect_cache_size_(level);
-      cache_line[level-1]=impl_::detect_cache_line_(level);
-    }
 #if defined __APPLE__
     auto value=0;
     impl_::sysctl_by_name_("hw.packages", value);
@@ -489,9 +491,7 @@ detect()
     {
       auto &l3_grp=root.children.emplace_back(TopologyGroup{});
       l3_grp.numa=NumaId{pkg};
-      l3_grp.cache_level=3;
-      l3_grp.cache_size=cache_size[2];
-      l3_grp.cache_line=cache_line[2];
+      l3_grp.cache_level=3; // hardcoded
       const auto cpu_begin=cpu_count*pkg/pkg_count;
       const auto cpu_end=std::min(cpu_count, cpu_count*(pkg+1)/pkg_count);
       for(auto cpu=cpu_begin; cpu<cpu_end; ++cpu)
@@ -503,13 +503,9 @@ detect()
       for(auto core=0; core<pkg_core_count; ++core)
       {
         auto &l2_grp=l3_grp.children.emplace_back(TopologyGroup{});
-        l2_grp.cache_level=2;
-        l2_grp.cache_size=cache_size[1];
-        l2_grp.cache_line=cache_line[1];
+        l2_grp.cache_level=2; // hardcoded
         auto &l1_grp=l2_grp.children.emplace_back(TopologyGroup{});
-        l1_grp.cache_level=1;
-        l1_grp.cache_size=cache_size[0];
-        l1_grp.cache_line=cache_line[0];
+        l1_grp.cache_level=1; // hardcoded
         for(auto smt=0; smt<smt_count; ++smt)
         {
           const auto idx=core*smt_count+smt;
@@ -523,8 +519,32 @@ detect()
         }
       }
     }
-    // FIXME: detect other properties?
   }
+  int cache_size[3]={0}, cache_line[3]={0};
+  for(auto level=1; level<=3; ++level)
+  {
+    cache_size[level-1]=impl_::detect_cache_size_(level);
+    cache_line[level-1]=impl_::detect_cache_line_(level);
+  }
+  visit(root,
+    [&](const auto &grp, const auto &)
+    {
+      for(auto level=1; level<=3; ++level)
+      {
+        if(grp.cache_level==level)
+        {
+          if(grp.cache_size<=0)
+          {
+            const_cast<int &>(grp.cache_size)=cache_size[level-1];
+          }
+          if(grp.cache_line<=0)
+          {
+            const_cast<int &>(grp.cache_line)=cache_line[level-1];
+          }
+        }
+      }
+      return true;
+    });
   return root;
 }
 
