@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <chrono>
 #include <tuple>
+#include <type_traits>
 #include <algorithm>
 
 #define DIM_RESTRICT __restrict__
@@ -40,9 +41,12 @@ sequence_part(T seq_begin,
               int part_id,
               int part_count)
 {
-  auto seq_size=seq_end-seq_begin;
-  auto part_begin=seq_size*part_id/part_count;
-  auto part_end=std::min(seq_size, seq_size*(part_id+1)/part_count);
+  // use a wide integer to prevent overflow in multiplication
+  using wide_t =
+    std::conditional_t<std::is_unsigned_v<T>, std::uintmax_t, std::intmax_t>;
+  const auto seq_size=wide_t{seq_end-seq_begin};
+  auto part_begin=T(seq_size*part_id/part_count);
+  auto part_end=T(std::min(seq_size, seq_size*(part_id+1)/part_count));
   return {seq_begin+part_begin, seq_begin+part_end};
 }
 

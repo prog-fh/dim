@@ -78,6 +78,12 @@ public:
   static_assert((alignment%simd_t::vector_size)==0,
                 "alignment should be a multiple of simd vector size");
 
+  int
+  simd_count() const
+  {
+    return (count_+simd_t::value_count-1)/simd_t::value_count;
+  }
+
   simd_t *
   simd_data() DIM_ASSUME_ALIGNED(alignment)
   {
@@ -134,9 +140,8 @@ private:
     using simd_t##id = typename std::decay_t<decltype(buffer##id)>::simd_t; \
     static_assert(simd_t1::value_count==simd_t##id::value_count);
 # define DIM_ALIGNED_BUFFER_ITERATE(call) \
-    const auto count=(buffer1.count()+simd_t1::value_count-1)/ \
-                     simd_t1::value_count; \
-    for(auto [i, i_end]= sequence_part(count, part_id, part_count); \
+    const auto count=buffer1.simd_count(); \
+    for(auto [i, i_end]=sequence_part(count, part_id, part_count); \
         i<i_end; ++i) { call; }
 #endif
 
