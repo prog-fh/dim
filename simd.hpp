@@ -550,6 +550,80 @@ up(Simd<VectorType> s)
   return down<s.value_count-N>(s);
 }
 
+template<idx_t N,
+         typename VectorType>
+inline constexpr
+auto
+down(Simd<VectorType> low,
+     Simd<VectorType> high)
+{
+  constexpr auto c=low.value_count+high.value_count;
+  if constexpr(c==128)
+  {
+    return shuffle<( 0+N)%c, ( 1+N)%c, ( 2+N)%c, ( 3+N)%c,
+                   ( 4+N)%c, ( 5+N)%c, ( 6+N)%c, ( 7+N)%c,
+                   ( 8+N)%c, ( 9+N)%c, (10+N)%c, (11+N)%c,
+                   (12+N)%c, (13+N)%c, (14+N)%c, (15+N)%c,
+                   (16+N)%c, (17+N)%c, (18+N)%c, (19+N)%c,
+                   (20+N)%c, (21+N)%c, (22+N)%c, (23+N)%c,
+                   (24+N)%c, (25+N)%c, (26+N)%c, (27+N)%c,
+                   (28+N)%c, (29+N)%c, (30+N)%c, (31+N)%c,
+                   (32+N)%c, (33+N)%c, (34+N)%c, (35+N)%c,
+                   (36+N)%c, (37+N)%c, (38+N)%c, (39+N)%c,
+                   (40+N)%c, (41+N)%c, (42+N)%c, (43+N)%c,
+                   (44+N)%c, (45+N)%c, (46+N)%c, (47+N)%c,
+                   (48+N)%c, (49+N)%c, (50+N)%c, (51+N)%c,
+                   (52+N)%c, (53+N)%c, (54+N)%c, (55+N)%c,
+                   (56+N)%c, (57+N)%c, (58+N)%c, (59+N)%c,
+                   (60+N)%c, (61+N)%c, (62+N)%c, (63+N)%c>(low, high);
+  }
+  else if constexpr(c==64)
+  {
+    return shuffle<( 0+N)%c, ( 1+N)%c, ( 2+N)%c, ( 3+N)%c,
+                   ( 4+N)%c, ( 5+N)%c, ( 6+N)%c, ( 7+N)%c,
+                   ( 8+N)%c, ( 9+N)%c, (10+N)%c, (11+N)%c,
+                   (12+N)%c, (13+N)%c, (14+N)%c, (15+N)%c,
+                   (16+N)%c, (17+N)%c, (18+N)%c, (19+N)%c,
+                   (20+N)%c, (21+N)%c, (22+N)%c, (23+N)%c,
+                   (24+N)%c, (25+N)%c, (26+N)%c, (27+N)%c,
+                   (28+N)%c, (29+N)%c, (30+N)%c, (31+N)%c>(low, high);
+  }
+  else if constexpr(c==32)
+  {
+    return shuffle<( 0+N)%c, ( 1+N)%c, ( 2+N)%c, ( 3+N)%c,
+                   ( 4+N)%c, ( 5+N)%c, ( 6+N)%c, ( 7+N)%c,
+                   ( 8+N)%c, ( 9+N)%c, (10+N)%c, (11+N)%c,
+                   (12+N)%c, (13+N)%c, (14+N)%c, (15+N)%c>(low, high);
+  }
+  else if constexpr(c==16)
+  {
+    return shuffle<( 0+N)%c, ( 1+N)%c, ( 2+N)%c, ( 3+N)%c,
+                   ( 4+N)%c, ( 5+N)%c, ( 6+N)%c, ( 7+N)%c>(low, high);
+  }
+  else if constexpr(c==8)
+  {
+    return shuffle<( 0+N)%c, ( 1+N)%c, ( 2+N)%c, ( 3+N)%c>(low, high);
+  }
+  else if constexpr(c==4)
+  {
+    return shuffle<( 0+N)%c, ( 1+N)%c>(low, high);
+  }
+  else
+  {
+    return (N%2) ? high : low;
+  }
+}
+
+template<idx_t N,
+         typename VectorType>
+inline constexpr
+auto
+up(Simd<VectorType> low,
+   Simd<VectorType> high)
+{
+  return down<low.value_count+high.value_count-N>(low, high);
+}
+
 template<typename VectorType>
 inline constexpr
 auto
@@ -811,33 +885,33 @@ transform(Simd<VectorType> s,
   return Simd{result};
 }
 
-#define DIM_SIMD_TRANSFORM(name, fnct) \
+#define DIM_SIMD_TRANSFORM_STD_MATH(name) \
         template<typename VectorType> \
         auto \
         name(Simd<VectorType> s) \
         { \
           using value_t = typename Simd<VectorType>::value_type; \
-          return transform(s, static_cast<value_t (*)(value_t)>(fnct)); \
+          return transform(s, static_cast<value_t (*)(value_t)>(std::name)); \
         }
 
-DIM_SIMD_TRANSFORM(abs,   std::abs)
-DIM_SIMD_TRANSFORM(exp,   std::exp)
-DIM_SIMD_TRANSFORM(log,   std::log)
-DIM_SIMD_TRANSFORM(sqrt,  std::sqrt)
-DIM_SIMD_TRANSFORM(cbrt,  std::cbrt)
-DIM_SIMD_TRANSFORM(sin,   std::sin)
-DIM_SIMD_TRANSFORM(cos,   std::cos)
-DIM_SIMD_TRANSFORM(tan,   std::tan)
-DIM_SIMD_TRANSFORM(asin,  std::asin)
-DIM_SIMD_TRANSFORM(acos,  std::acos)
-DIM_SIMD_TRANSFORM(atan,  std::atan)
-DIM_SIMD_TRANSFORM(sinh,  std::sinh)
-DIM_SIMD_TRANSFORM(cosh,  std::cosh)
-DIM_SIMD_TRANSFORM(tanh,  std::tanh)
-DIM_SIMD_TRANSFORM(ceil,  std::sinh)
-DIM_SIMD_TRANSFORM(floor, std::floor)
-DIM_SIMD_TRANSFORM(trunc, std::trunc)
-DIM_SIMD_TRANSFORM(round, std::round)
+DIM_SIMD_TRANSFORM_STD_MATH(abs)
+DIM_SIMD_TRANSFORM_STD_MATH(exp)
+DIM_SIMD_TRANSFORM_STD_MATH(log)
+DIM_SIMD_TRANSFORM_STD_MATH(sqrt)
+DIM_SIMD_TRANSFORM_STD_MATH(cbrt)
+DIM_SIMD_TRANSFORM_STD_MATH(sin)
+DIM_SIMD_TRANSFORM_STD_MATH(cos)
+DIM_SIMD_TRANSFORM_STD_MATH(tan)
+DIM_SIMD_TRANSFORM_STD_MATH(asin)
+DIM_SIMD_TRANSFORM_STD_MATH(acos)
+DIM_SIMD_TRANSFORM_STD_MATH(atan)
+DIM_SIMD_TRANSFORM_STD_MATH(sinh)
+DIM_SIMD_TRANSFORM_STD_MATH(cosh)
+DIM_SIMD_TRANSFORM_STD_MATH(tanh)
+DIM_SIMD_TRANSFORM_STD_MATH(ceil)
+DIM_SIMD_TRANSFORM_STD_MATH(floor)
+DIM_SIMD_TRANSFORM_STD_MATH(trunc)
+DIM_SIMD_TRANSFORM_STD_MATH(round)
 
 #undef DIM_SIMD_TRANSFORM
 
