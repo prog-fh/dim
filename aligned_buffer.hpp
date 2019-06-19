@@ -154,7 +154,8 @@ apply0(int part_id, int part_count,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(1)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i]))
 }
 
 template<typename T1,
@@ -169,7 +170,8 @@ apply0(int part_id, int part_count,
 {
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(1)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i]))
 }
 
 template<typename T1,
@@ -187,7 +189,8 @@ apply0(int part_id, int part_count,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(1)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i]))
 }
 
 template<typename T1,
@@ -208,7 +211,8 @@ apply0(int part_id, int part_count,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i]))
 }
 
 template<typename T1,
@@ -232,7 +236,8 @@ apply0(int part_id, int part_count,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
 }
 
 template<typename T1,
@@ -259,7 +264,39 @@ apply0(int part_id, int part_count,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+}
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply0(int part_id, int part_count,
+       const AlignedBuffer<T1> &buffer1,
+       const AlignedBuffer<T2> &buffer2,
+       const AlignedBuffer<T3> &buffer3,
+       const AlignedBuffer<T4> &buffer4,
+       const AlignedBuffer<T5> &buffer5,
+       const AlignedBuffer<T6> &buffer6,
+       const AlignedBuffer<T7> &buffer7,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
 }
 
 //----------------------------------------------------------------------------
@@ -273,7 +310,8 @@ apply1(AlignedBuffer<T1> &buffer1,
        Fnct fnct)
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i]))
 }
 
 template<typename T1,
@@ -288,7 +326,8 @@ apply1(AlignedBuffer<T1> &buffer1,
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i]))
 }
 
 template<typename T1,
@@ -306,7 +345,8 @@ apply1(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i]))
 }
 
 template<typename T1,
@@ -327,7 +367,8 @@ apply1(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i]))
 }
 
 template<typename T1,
@@ -351,7 +392,8 @@ apply1(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
 }
 
 template<typename T1,
@@ -378,7 +420,39 @@ apply1(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+}
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply1(AlignedBuffer<T1> &buffer1,
+       int part_id, int part_count,
+       const AlignedBuffer<T2> &buffer2,
+       const AlignedBuffer<T3> &buffer3,
+       const AlignedBuffer<T4> &buffer4,
+       const AlignedBuffer<T5> &buffer5,
+       const AlignedBuffer<T6> &buffer6,
+       const AlignedBuffer<T7> &buffer7,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
 }
 
 //----------------------------------------------------------------------------
@@ -395,7 +469,8 @@ apply2(AlignedBuffer<T1> &buffer1,
 {
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i]))
 }
 
 template<typename T1,
@@ -413,7 +488,8 @@ apply2(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i]))
 }
 
 template<typename T1,
@@ -434,7 +510,8 @@ apply2(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i]))
 }
 
 template<typename T1,
@@ -458,7 +535,8 @@ apply2(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
 }
 
 template<typename T1,
@@ -485,7 +563,39 @@ apply2(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+}
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply2(AlignedBuffer<T1> &buffer1,
+       AlignedBuffer<T2> &buffer2,
+       int part_id, int part_count,
+       const AlignedBuffer<T3> &buffer3,
+       const AlignedBuffer<T4> &buffer4,
+       const AlignedBuffer<T5> &buffer5,
+       const AlignedBuffer<T6> &buffer6,
+       const AlignedBuffer<T7> &buffer7,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
 }
 
 //----------------------------------------------------------------------------
@@ -505,7 +615,8 @@ apply3(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i]))
 }
 
 template<typename T1,
@@ -526,7 +637,8 @@ apply3(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i]))
 }
 
 template<typename T1,
@@ -550,7 +662,8 @@ apply3(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
 }
 
 template<typename T1,
@@ -577,7 +690,39 @@ apply3(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+}
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply3(AlignedBuffer<T1> &buffer1,
+       AlignedBuffer<T2> &buffer2,
+       AlignedBuffer<T3> &buffer3,
+       int part_id, int part_count,
+       const AlignedBuffer<T4> &buffer4,
+       const AlignedBuffer<T5> &buffer5,
+       const AlignedBuffer<T6> &buffer6,
+       const AlignedBuffer<T7> &buffer7,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
 }
 
 //----------------------------------------------------------------------------
@@ -600,7 +745,8 @@ apply4(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i]))
 }
 
 template<typename T1,
@@ -624,7 +770,8 @@ apply4(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
 }
 
 template<typename T1,
@@ -651,7 +798,39 @@ apply4(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+}
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply4(AlignedBuffer<T1> &buffer1,
+       AlignedBuffer<T2> &buffer2,
+       AlignedBuffer<T3> &buffer3,
+       AlignedBuffer<T4> &buffer4,
+       int part_id, int part_count,
+       const AlignedBuffer<T5> &buffer5,
+       const AlignedBuffer<T6> &buffer6,
+       const AlignedBuffer<T7> &buffer7,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
 }
 
 //----------------------------------------------------------------------------
@@ -677,7 +856,8 @@ apply5(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(5)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i]))
 }
 
 template<typename T1,
@@ -704,7 +884,39 @@ apply5(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(5)
   DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+}
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply5(AlignedBuffer<T1> &buffer1,
+       AlignedBuffer<T2> &buffer2,
+       AlignedBuffer<T3> &buffer3,
+       AlignedBuffer<T4> &buffer4,
+       AlignedBuffer<T5> &buffer5,
+       int part_id, int part_count,
+       const AlignedBuffer<T6> &buffer6,
+       const AlignedBuffer<T7> &buffer7,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
 }
 
 //----------------------------------------------------------------------------
@@ -733,7 +945,72 @@ apply6(AlignedBuffer<T1> &buffer1,
   DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(5)
   DIM_ALIGNED_BUFFER_ACCESS_DATA(6)
-  DIM_ALIGNED_BUFFER_ITERATE(fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i]))
+}
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply6(AlignedBuffer<T1> &buffer1,
+       AlignedBuffer<T2> &buffer2,
+       AlignedBuffer<T3> &buffer3,
+       AlignedBuffer<T4> &buffer4,
+       AlignedBuffer<T5> &buffer5,
+       AlignedBuffer<T6> &buffer6,
+       int part_id, int part_count,
+       const AlignedBuffer<T7> &buffer7,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_CDATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
+}
+
+//----------------------------------------------------------------------------
+
+template<typename T1,
+         typename T2,
+         typename T3,
+         typename T4,
+         typename T5,
+         typename T6,
+         typename T7,
+         typename Fnct>
+inline
+void
+apply6(AlignedBuffer<T1> &buffer1,
+       AlignedBuffer<T2> &buffer2,
+       AlignedBuffer<T3> &buffer3,
+       AlignedBuffer<T4> &buffer4,
+       AlignedBuffer<T5> &buffer5,
+       AlignedBuffer<T6> &buffer6,
+       AlignedBuffer<T7> &buffer7,
+       int part_id, int part_count,
+       Fnct fnct)
+{
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(1)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(2)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(3)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(4)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(5)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(6)
+  DIM_ALIGNED_BUFFER_ACCESS_DATA(7)
+  DIM_ALIGNED_BUFFER_ITERATE(
+    fnct(d1[i], d2[i], d3[i], d4[i], d5[i], d6[i], d7[i]))
 }
 
 #undef DIM_ALIGNED_BUFFER_ACCESS_DATA
@@ -751,7 +1028,7 @@ fill(AlignedBuffer<T> &dst,
 {
   apply1(dst,
     part_id, part_count,
-    [&value](auto &p)
+    [&](auto &p)
     {
       p=value;
     });
@@ -815,7 +1092,7 @@ sum(const AlignedBuffer<T> &buffer,
   apply0(
     part_id, part_count,
     buffer,
-    [&accum](const auto & p)
+    [&](const auto & p)
     {
       accum+=p;
     });

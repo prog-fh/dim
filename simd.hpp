@@ -51,7 +51,7 @@ public:
   constexpr Simd & operator=(vector_type v) { v_=v; return *this; }
   constexpr Simd(value_type v)
   : v_{
-    [&v]()
+    [&]()
     {
       constexpr auto c=value_count;
       if constexpr(c==64)
