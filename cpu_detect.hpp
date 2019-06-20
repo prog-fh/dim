@@ -23,6 +23,7 @@
 
 #include <vector>
 #include <string>
+#include <cstring>
 #include <algorithm>
 #include <iostream>
 #include <thread>
