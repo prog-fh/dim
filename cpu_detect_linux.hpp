@@ -197,7 +197,7 @@ detect_()
       collect_next_level_(child);
     }
   }
-  else // probably Windows-Subsystem-for-Linux
+  else // probably Windows-Subsystem-for-Linux or Raspbian
   {
     for(const auto &cpu: root.cpus)
     {

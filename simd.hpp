@@ -3,7 +3,9 @@
 #ifndef DIM_SIMD_HPP
 #define DIM_SIMD_HPP 1
 
-#include <immintrin.h>
+#if __x86_64__
+# include <immintrin.h>
+#endif
 #include <cstdint>
 #include <type_traits>
 #include <tuple>

@@ -12,7 +12,11 @@
 # endif
 # include <windows.h>
 #else
-# include <sys/sysctl.h>
+# if defined __linux__
+#  include <linux/sysctl.h>
+# else
+#  include <sys/sysctl.h>
+# endif
 # include <unistd.h>
 #endif
 
@@ -183,7 +187,11 @@ collect_indexth_cpu_of_cache_level(const TopologyGroup &root,
         {
           if(is_cpu(grp)&&(count--==0))
           {
-            result.emplace_back(grp.cpus.front());
+            const auto id=grp.cpus.front();
+            if(find(cbegin(result), cend(result), id)==cend(result))
+            {
+              result.emplace_back(id);
+            }
             return false;
           }
           return true;

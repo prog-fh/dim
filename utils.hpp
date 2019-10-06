@@ -26,6 +26,7 @@ system_time_us()
                       <std::chrono::microseconds>(now).count());
 }
 
+inline
 double // seconds (1e-6 precision) since 1970/01/01 00:00:00 UTC
 system_time()
 {

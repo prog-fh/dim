@@ -121,6 +121,12 @@ private:
 
 //----------------------------------------------------------------------------
 
+#if 0
+#  define DIM_ALIGNED_BUFFER_UNROLL _Pragma("GCC unroll 8")
+#else
+#  define DIM_ALIGNED_BUFFER_UNROLL
+#endif
+
 #if DIM_ALIGNED_BUFFER_DISABLE_SIMD
 # define DIM_ALIGNED_BUFFER_ACCESS_DATA(id) \
     auto * DIM_RESTRICT d##id=buffer##id.data();
@@ -128,6 +134,7 @@ private:
     const auto * DIM_RESTRICT d##id=buffer##id.cdata();
 # define DIM_ALIGNED_BUFFER_ITERATE(call) \
     const auto count=buffer1.count(); \
+    DIM_ALIGNED_BUFFER_UNROLL \
     for(auto [i, i_end]=sequence_part(count, part_id, part_count); \
         i<i_end; ++i) { call; }
 #else
@@ -141,6 +148,7 @@ private:
     static_assert(simd_t1::value_count==simd_t##id::value_count);
 # define DIM_ALIGNED_BUFFER_ITERATE(call) \
     const auto count=buffer1.simd_count(); \
+    DIM_ALIGNED_BUFFER_UNROLL \
     for(auto [i, i_end]=sequence_part(count, part_id, part_count); \
         i<i_end; ++i) { call; }
 #endif
@@ -1016,6 +1024,7 @@ apply6(AlignedBuffer<T1> &buffer1,
 #undef DIM_ALIGNED_BUFFER_ACCESS_DATA
 #undef DIM_ALIGNED_BUFFER_ACCESS_CDATA
 #undef DIM_ALIGNED_BUFFER_ITERATE
+#undef DIM_ALIGNED_BUFFER_UNROLL
 
 //----------------------------------------------------------------------------
 

@@ -333,6 +333,26 @@ compute_partial_cache_size(const Platform &p,
 }
 
 inline
+int // sum of cache sizes accessible to used cpus
+compute_total_cache_size(const Platform &p,
+                         int level)
+{
+  auto cache_size=0;
+  auto caches=std::vector<const TopologyGroup *>{};
+  for(auto index=0; index<p.cpu_count(); ++index)
+  {
+    const auto *found=
+      find_cache(p.topology(), p.cpu_id(index), level);
+    if(found&&find(cbegin(caches), cend(caches), found)==cend(caches))
+    {
+      caches.emplace_back(found);
+      cache_size+=found->cache_size;
+    }
+  }
+  return cache_size;
+}
+
+inline
 std::string
 to_string(const Platform &p)
 {
