@@ -3,8 +3,10 @@
 #ifndef DIM_SIMD_HPP
 #define DIM_SIMD_HPP 1
 
-#if __x86_64__
-# include <immintrin.h>
+#if __i386__ || __x86_64__
+# include <x86intrin.h>
+#elif __ARM_FEATURE_SIMD32 || __ARM_NEON
+# include <arm_neon.h>
 #endif
 #include <cstdint>
 #include <type_traits>
@@ -20,13 +22,17 @@ namespace impl_ {
 template<typename ValueType,
          int VectorSize>
 struct simd_helper { using type = void; };
+template<typename ValueType,
+         int VectorSize>
+using simd_helper_t =
+  typename simd_helper<ValueType, VectorSize>::type;
 
 } // namespace impl_
 
 template<typename ValueType,
          int VectorSize>
-using simd_t = typename impl_::simd_helper<
-  typename std::decay<ValueType>::type, VectorSize>::type;
+using simd_t = typename impl_::simd_helper_t<
+  typename std::decay_t<ValueType>, VectorSize>;
 
 template<typename VectorType>
 class Simd
@@ -35,18 +41,18 @@ public:
 
   using vector_type = VectorType;
   using value_type =
-    typename std::decay<decltype(std::declval<vector_type>()[0])>::type;
+    typename std::decay_t<decltype(std::declval<vector_type>()[0])>;
 
   static constexpr auto vector_size = int(sizeof(vector_type));
   static constexpr auto value_size  = int(sizeof(value_type));
   static constexpr auto value_count = vector_size/value_size;
 
   using mask_type = simd_t<
-    typename std::conditional<value_size==1, std::int8_t,
-    typename std::conditional<value_size==2, std::int16_t,
-    typename std::conditional<value_size==4, std::int32_t,
-    typename std::conditional<value_size==8, std::int64_t,
-    void>::type>::type>::type>::type, vector_size>;
+    typename std::conditional_t<value_size==1, std::uint8_t,
+    typename std::conditional_t<value_size==2, std::uint16_t,
+    typename std::conditional_t<value_size==4, std::uint32_t,
+    typename std::conditional_t<value_size==8, std::uint64_t,
+    void>>>>, vector_size>;
 
   constexpr Simd() : v_{} {};
   constexpr Simd(vector_type v) : v_{v} {};
@@ -109,42 +115,34 @@ private:
 template<typename SimdType,
          typename ValueType>
 using expect_value_type =
-  typename std::enable_if<
-    std::is_same<
+  typename std::enable_if_t<
+    std::is_same_v<
       typename SimdType::value_type,
-      typename std::decay<ValueType>::type
-      >::value
-    >::type;
+      typename std::decay_t<ValueType>>>;
 
 template<typename SimdType,
          int VectorSize>
 using expect_vector_size =
-  typename std::enable_if<
-    std::is_same<
+  typename std::enable_if_t<
+    std::is_same_v<
       typename std::integral_constant<int, SimdType::vector_size>,
-      typename std::integral_constant<int, VectorSize>
-      >::value
-    >::type;
+      typename std::integral_constant<int, VectorSize>>>;
 
 template<typename SimdType,
          int ValueSize>
 using expect_value_size =
-  typename std::enable_if<
-    std::is_same<
+  typename std::enable_if_t<
+    std::is_same_v<
       typename std::integral_constant<int, SimdType::value_size>,
-      typename std::integral_constant<int, ValueSize>
-      >::value
-    >::type;
+      typename std::integral_constant<int, ValueSize>>>;
 
 template<typename SimdType,
          int ValueCount>
 using expect_value_count =
-  typename std::enable_if<
-    std::is_same<
+  typename std::enable_if_t<
+    std::is_same_v<
       typename std::integral_constant<int, SimdType::value_count>,
-      typename std::integral_constant<int, ValueCount>
-      >::value
-    >::type;
+      typename std::integral_constant<int, ValueCount>>>;
 
 //~~~~ enumerate available simd types ~~~~
 
@@ -152,7 +150,7 @@ using expect_value_count =
 # define DIM_SIMD_MAX_VECTOR_SIZE 64
 #elif __AVX__
 # define DIM_SIMD_MAX_VECTOR_SIZE 32
-#else
+#else // assume 16-byte vector instruction by default
 # define DIM_SIMD_MAX_VECTOR_SIZE 16
 #endif
 

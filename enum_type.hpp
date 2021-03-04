@@ -79,7 +79,7 @@ public:
   : rank_{rhs.rank_}
   , storage_{}
   {
-    copyInit_<Types...>(rank_, rhs);
+    copy_init_<Types...>(rank_, rhs);
   }
 
   EnumType &
@@ -89,7 +89,7 @@ public:
     {
       destroy_<Types...>(rank_);
       rank_=rhs.rank_;
-      copyInit_<Types...>(rank_, rhs);
+      copy_init_<Types...>(rank_, rhs);
     }
     return *this;
   }
@@ -98,7 +98,7 @@ public:
   : rank_{rhs.rank_}
   , storage_{}
   {
-    moveInit_<Types...>(rank_, std::move(rhs));
+    move_init_<Types...>(rank_, std::move(rhs));
     rhs.rank_=0;
   }
 
@@ -109,7 +109,7 @@ public:
     {
       destroy_<Types...>(rank_);
       rank_=rhs.rank_;
-      moveInit_<Types...>(rank_, std::move(rhs));
+      move_init_<Types...>(rank_, std::move(rhs));
       rhs.rank_=0;
     }
     return *this;
@@ -205,7 +205,7 @@ private:
   struct TypeRank;
 
   template<typename ...Tail>
-  static constexpr unsigned char TypeRank_v=TypeRank<Tail...>::value;
+  static constexpr Rank TypeRank_v=TypeRank<Tail...>::value;
 
   template<typename T,
            typename ...Tail>
@@ -221,8 +221,8 @@ private:
   template<typename Head,
            typename ...Tail>
   void
-  copyInit_(Rank rank,
-            const EnumType &rhs)
+  copy_init_(Rank rank,
+             const EnumType &rhs)
   {
     if(rank==1)
     {
@@ -231,15 +231,15 @@ private:
     }
     if constexpr(sizeof...(Tail)>0)
     {
-      copyInit_<Tail...>(--rank, rhs);
+      copy_init_<Tail...>(--rank, rhs);
     }
   }
 
   template<typename Head,
            typename ...Tail>
   void
-  moveInit_(Rank rank,
-            EnumType &&rhs)
+  move_init_(Rank rank,
+             EnumType &&rhs)
   {
     if(rank==1)
     {
@@ -248,7 +248,7 @@ private:
     }
     if constexpr(sizeof...(Tail)>0)
     {
-      moveInit_<Tail...>(--rank, std::move(rhs));
+      move_init_<Tail...>(--rank, std::move(rhs));
     }
   }
 

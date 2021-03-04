@@ -21,13 +21,13 @@ using enumerate_container_support =
   decltype(*begin(std::declval<Container>()),
            *end(std::declval<Container>()),
            size(std::declval<Container>()),
-           1);
+           void(), 1);
 
 template<typename Counter>
 using enumerate_counter_support =
   decltype((std::declval<Counter>()!=std::declval<Counter>()),
            ++std::declval<std::add_lvalue_reference_t<Counter>>(),
-           1);
+           void(), 1);
 
 } // namespace impl_
 

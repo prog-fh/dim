@@ -163,7 +163,7 @@ public:
         }
       }
     }
-    // compute distance, proximity and roudtrip
+    // compute distance, proximity and roundtrip
     auto max_distance=0;
     distances_=std::make_unique<std::unique_ptr<int[]>[]>(cpu_count_);
     for(auto cpu=0; cpu<cpu_count_; ++cpu)
@@ -310,7 +310,7 @@ disable_smt(Platform &p)
 }
 
 inline
-int // cache size divided by number of cpus in shared cache
+int // cache size divided by number of cpus in shared cache or -1 if not found
 compute_partial_cache_size(const Platform &p,
                            int cpu_index,
                            int level)
