@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_CPU_DETECT_HPP
-#define DIM_CPU_DETECT_HPP 1
+#define DIM_CPU_DETECT_HPP
 
 #if defined _WIN32
 # if !defined _WIN32_WINNT

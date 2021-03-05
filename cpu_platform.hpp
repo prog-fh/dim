@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_CPU_PLATFORM_HPP
-#define DIM_CPU_PLATFORM_HPP 1
+#define DIM_CPU_PLATFORM_HPP
 
 #include "cpu_detect.hpp"
 

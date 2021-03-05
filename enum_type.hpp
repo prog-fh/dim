@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_ENUM_TYPE_HPP
-#define DIM_ENUM_TYPE_HPP 1
+#define DIM_ENUM_TYPE_HPP
 
 /**
 inspired from

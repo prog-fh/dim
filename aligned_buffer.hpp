@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_ALIGNED_BUFFER_HPP
-#define DIM_ALIGNED_BUFFER_HPP 1
+#define DIM_ALIGNED_BUFFER_HPP
 
 #include "utils.hpp"
 

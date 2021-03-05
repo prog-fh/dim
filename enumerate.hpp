@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_ENUMERATE_HPP
-#define DIM_ENUMERATE_HPP 1
+#define DIM_ENUMERATE_HPP
 
 /**
 inspired from

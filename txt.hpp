@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_TXT_HPP
-#define DIM_TXT_HPP 1
+#define DIM_TXT_HPP
 
 #include <type_traits>
 #include <string>

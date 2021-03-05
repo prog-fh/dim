@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_SYNCHRO_HPP
-#define DIM_SYNCHRO_HPP 1
+#define DIM_SYNCHRO_HPP
 
 #include <atomic>
 

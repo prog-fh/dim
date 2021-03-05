@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_CPU_DETECT_LINUX_HPP
-#define DIM_CPU_DETECT_LINUX_HPP 1
+#define DIM_CPU_DETECT_LINUX_HPP
 
 // included from "cpu_detect.hpp"
 

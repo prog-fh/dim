@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_SIMD_HPP
-#define DIM_SIMD_HPP 1
+#define DIM_SIMD_HPP
 
 #if __i386__ || __x86_64__
 # include <x86intrin.h>

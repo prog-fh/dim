@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 
 #ifndef DIM_UTILS_HPP
-#define DIM_UTILS_HPP 1
+#define DIM_UTILS_HPP
 
 #include <cstdint>
 #include <chrono>
