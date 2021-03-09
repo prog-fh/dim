@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <tuple>
 #include <cmath>
+#include <algorithm>
 #include <string>
 #include <iostream>
 
@@ -866,6 +867,23 @@ store_suffix(typename Simd<VectorType>::value_type *values,
   }
 }
 
+template<typename VectorType,
+         typename ValueType>
+inline
+auto
+gather(Simd<VectorType> index,
+       const ValueType *source)
+{
+  constexpr auto value_count=Simd<VectorType>::value_count;
+  using result_t = simd_t<ValueType, value_count*sizeof(ValueType)>;
+  auto result=result_t{};
+  for(auto i=0; i<value_count; ++i)
+  {
+    result.vec()[i]=source[index[i]];
+  }
+  return result;
+}
+
 //~~~~ math functions ~~~~
 
 template<typename VectorType,
@@ -941,6 +959,32 @@ horizontal_product(const Simd<VectorType> &s)
     product*=s[i];
   }
   return product;
+}
+
+template<typename VectorType>
+inline
+auto
+horizontal_min(const Simd<VectorType> &s)
+{
+  auto min_elem=s[0];
+  for(auto i=0; i<s.value_count; ++i)
+  {
+    min_elem=std::min(min_elem, s[i]);
+  }
+  return min_elem;
+}
+
+template<typename VectorType>
+inline
+auto
+horizontal_max(const Simd<VectorType> &s)
+{
+  auto max_elem=s[0];
+  for(auto i=0; i<s.value_count; ++i)
+  {
+    max_elem=std::max(max_elem, s[i]);
+  }
+  return max_elem;
 }
 
 //~~~~ display operations ~~~~

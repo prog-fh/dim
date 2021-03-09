@@ -143,18 +143,15 @@ public:
     return result;
   }
 
-private:
-
-  void
-  open_(std::string path)
+  std::string
+  relative_path(std::string path)
   {
 #if 0 // defined _WIN32 // file opening uses /
     constexpr auto sep='\\';
 #else
     constexpr auto sep='/';
 #endif
-    auto stream=std::ifstream{path};
-    if(!stream&&!empty(path)&&(path.front()!=sep)&&!empty(input_))
+    if(!empty(path)&&(path.front()!=sep)&&!empty(input_))
     {
       const auto &p=input_.back().path;
       if(const auto pos=p.find_last_of(sep); pos!=p.npos)
@@ -162,10 +159,27 @@ private:
         auto actual_path=p.substr(0, pos);
         actual_path+=sep;
         actual_path+=path;
-        stream=std::ifstream{actual_path};
+        path=std::move(actual_path);
+      }
+    }
+    return path;
+  }
+
+private:
+
+  void
+  open_(std::string path)
+  {
+    auto stream=std::ifstream{path};
+    if(!stream)
+    {
+      const auto rel_path=relative_path(path);
+      if(rel_path!=path)
+      {
+        stream=std::ifstream{rel_path};
         if(stream)
         {
-          path=std::move(actual_path);
+          path=std::move(rel_path);
         }
       }
     }
