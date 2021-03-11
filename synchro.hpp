@@ -7,6 +7,131 @@
 
 namespace dim {
 
+namespace impl_ {
+
+void
+cpu_pause_()
+{
+#if defined _MSC_VER
+# if defined _M_IX86 || defined __INTEL_COMPILER
+  __asm { pause }
+# else
+  __nop();
+# endif
+#elif defined __POWERPC__
+   __asm__ __volatile__ ("ori r0,r0,0"); // fake nop
+#elif defined __i386__ || defined __x86_64__
+  __asm__ __volatile__ ("pause");
+#elif 0 // may not be available everywhere
+  __builtin_ia32_pause();
+#else
+  // just do nothing...
+#endif
+}
+
+} // namespace impl_
+
+class SpinLock
+{
+public:
+
+  SpinLock()
+  : flag_{free_flag_}
+  {
+    // nothing more to be done
+  }
+
+  bool // success
+  try_lock_w()
+  {
+    auto expected=free_flag_;
+    return flag_.compare_exchange_weak(expected, 0,
+                                       std::memory_order_acquire,
+                                       std::memory_order_relaxed);
+  }
+
+  void
+  lock_w()
+  {
+    while(!try_lock_w())
+    {
+      while(flag_.load(std::memory_order_relaxed)!=free_flag_)
+      {
+        impl_::cpu_pause_();
+      }
+    }
+  }
+
+  void
+  unlock_w()
+  {
+    flag_.fetch_add(free_flag_, std::memory_order_release);
+  }
+
+  bool // success
+  try_lock_r()
+  {
+    if(flag_.fetch_add(-1, std::memory_order_acquire)<1)
+    {
+      flag_.fetch_add(1, std::memory_order_relaxed);
+      return false;
+    }
+    else
+    {
+      return true;
+    }
+  }
+
+  void
+  lock_r()
+  {
+    while(!try_lock_r())
+    {
+      while(flag_.load(std::memory_order_relaxed)<=0)
+      {
+        impl_::cpu_pause_();
+      }
+    }
+  }
+
+  void
+  unlock_r()
+  {
+    flag_.fetch_add(1, std::memory_order_release);
+  }
+
+  bool // success
+  try_upgrade()
+  {
+    auto expected=free_flag_-1;
+    return flag_.compare_exchange_weak(expected, 0,
+                                       std::memory_order_acquire,
+                                       std::memory_order_relaxed);
+  }
+
+  void
+  upgrade()
+  {
+    while(!try_upgrade())
+    {
+      while(flag_.load(std::memory_order_relaxed)!=free_flag_-1)
+      {
+        impl_::cpu_pause_();
+      }
+    }
+  }
+
+  void
+  downgrade()
+  {
+    flag_.fetch_add(free_flag_-1, std::memory_order_release);
+  }
+
+private:
+  std::atomic_int32_t flag_;
+  static constexpr auto free_flag_=decltype(flag_)::value_type{0x01000000};
+};
+
 class Synchro
 {
 public:

@@ -14,10 +14,10 @@ namespace dim {
 template<typename RealType>
 struct Real3
 {
-  using real_t = RealType;
-
-  static_assert(std::is_floating_point_v<real_t>,
+  static_assert(std::is_floating_point_v<RealType>,
                 "floating point expected for template type");
+
+  using real_t = RealType;
 
   real_t x, y, z;
 

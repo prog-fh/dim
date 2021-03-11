@@ -49,10 +49,10 @@ public:
   static constexpr auto value_count = vector_size/value_size;
 
   using mask_type = simd_t<
-    typename std::conditional_t<value_size==1, std::uint8_t,
-    typename std::conditional_t<value_size==2, std::uint16_t,
-    typename std::conditional_t<value_size==4, std::uint32_t,
-    typename std::conditional_t<value_size==8, std::uint64_t,
+    typename std::conditional_t<value_size==1, std::int8_t,
+    typename std::conditional_t<value_size==2, std::int16_t,
+    typename std::conditional_t<value_size==4, std::int32_t,
+    typename std::conditional_t<value_size==8, std::int64_t,
     void>>>>, vector_size>;
 
   constexpr Simd() : v_{} {};
@@ -867,21 +867,38 @@ store_suffix(typename Simd<VectorType>::value_type *values,
   }
 }
 
-template<typename VectorType,
+template<typename IndexVectorType,
          typename ValueType>
 inline
 auto
-gather(Simd<VectorType> index,
-       const ValueType *source)
+gather(Simd<IndexVectorType> index,
+       const ValueType *aligned_source)
 {
-  constexpr auto value_count=Simd<VectorType>::value_count;
+  constexpr auto value_count=Simd<IndexVectorType>::value_count;
   using result_t = simd_t<ValueType, value_count*sizeof(ValueType)>;
   auto result=result_t{};
   for(auto i=0; i<value_count; ++i)
   {
-    result.vec()[i]=source[index[i]];
+    result.vec()[i]=aligned_source[index[i]];
   }
   return result;
+}
+
+template<typename VectorType,
+         typename IndexVectorType>
+inline
+void
+scatter(Simd<VectorType> values,
+        Simd<IndexVectorType> index,
+        typename Simd<VectorType>::value_type *aligned_destination)
+{
+  constexpr auto value_count=Simd<IndexVectorType>::value_count;
+  static_assert(value_count==Simd<VectorType>::value_count,
+                "index/value count mismatch");
+  for(auto i=0; i<value_count; ++i)
+  {
+    aligned_destination[index[i]]=values[i];
+  }
 }
 
 //~~~~ math functions ~~~~
@@ -985,6 +1002,21 @@ horizontal_max(const Simd<VectorType> &s)
     max_elem=std::max(max_elem, s[i]);
   }
   return max_elem;
+}
+
+template<typename VectorType>
+inline
+bool
+horizontal_null(const Simd<VectorType> &s)
+{
+  using value_t = typename Simd<VectorType>::value_type;
+  constexpr auto zero=value_t{};
+  auto r=zero;
+  for(auto i=0; i<s.value_count; ++i)
+  {
+    r|=s[i];
+  }
+  return r==zero;
 }
 
 //~~~~ display operations ~~~~
