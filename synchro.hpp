@@ -3,6 +3,7 @@
 #ifndef DIM_SYNCHRO_HPP
 #define DIM_SYNCHRO_HPP
 
+#include <cstdint>
 #include <atomic>
 
 namespace dim {
@@ -128,8 +129,12 @@ public:
   }
 
 private:
-  std::atomic_int32_t flag_;
-  static constexpr auto free_flag_=decltype(flag_)::value_type{0x01000000};
+
+  using flag_t = std::int32_t;
+
+  static constexpr auto free_flag_=flag_t{0x01000000};
+
+  std::atomic<flag_t> flag_;
 };
 
 class Synchro

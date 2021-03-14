@@ -7,6 +7,7 @@
 #include <chrono>
 #include <tuple>
 #include <type_traits>
+#include <limits>
 #include <algorithm>
 
 #define DIM_RESTRICT __restrict__
@@ -16,6 +17,33 @@
 namespace dim {
 
 constexpr auto assumed_cacheline_size = 64;
+
+template<typename T = double>
+inline constexpr
+auto pi()
+{
+  static_assert(std::is_floating_point_v<T>,
+                "floating point expected for template type");
+  return T(3.141592653589793238462643383279502884L);
+}
+
+template<typename T = double>
+inline constexpr
+auto inf()
+{
+  static_assert(std::is_floating_point_v<T>,
+                "floating point expected for template type");
+  return std::numeric_limits<T>::infinity();
+}
+
+template<typename T = double>
+inline constexpr
+auto eps()
+{
+  static_assert(std::is_floating_point_v<T>,
+                "floating point expected for template type");
+  return std::numeric_limits<T>::epsilon();
+}
 
 inline
 std::int64_t // microseconds since 1970/01/01 00:00:00 UTC

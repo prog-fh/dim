@@ -210,6 +210,78 @@ max_coord(const Real3<RealType> &lhs,
 }
 
 template<typename RealType>
+inline constexpr
+void
+rotate_x(Real3<RealType> &r3,
+         RealType angle)
+{
+  const auto ca=std::cos(angle), sa=std::sin(angle);
+  const auto y=r3.y*ca-r3.z*sa,
+             z=r3.y*sa+r3.z*ca;
+  r3.y=y;
+  r3.z=z;
+}
+
+template<typename RealType>
+inline constexpr
+Real3<RealType>
+rotated_x(const Real3<RealType> &r3,
+          RealType angle)
+{
+  auto result=r3;
+  rotate_x(result, angle);
+  return result;
+}
+
+template<typename RealType>
+inline constexpr
+void
+rotate_y(Real3<RealType> &r3,
+         RealType angle)
+{
+  const auto ca=std::cos(angle), sa=std::sin(angle);
+  const auto x=r3.z*sa+r3.x*ca,
+             z=r3.z*ca-r3.x*sa;
+  r3.x=x;
+  r3.z=z;
+}
+
+template<typename RealType>
+inline constexpr
+Real3<RealType>
+rotated_y(const Real3<RealType> &r3,
+          RealType angle)
+{
+  auto result=r3;
+  rotate_y(result, angle);
+  return result;
+}
+
+template<typename RealType>
+inline constexpr
+void
+rotate_z(Real3<RealType> &r3,
+         RealType angle)
+{
+  const auto ca=std::cos(angle), sa=std::sin(angle);
+  const auto x=r3.x*ca-r3.y*sa,
+             y=r3.x*sa+r3.y*ca;
+  r3.x=x;
+  r3.y=y;
+}
+
+template<typename RealType>
+inline constexpr
+Real3<RealType>
+rotated_z(const Real3<RealType> &r3,
+          RealType angle)
+{
+  auto result=r3;
+  rotate_z(result, angle);
+  return result;
+}
+
+template<typename RealType>
 inline
 std::string
 to_string(const Real3<RealType> &r3)
