@@ -5,6 +5,7 @@
 
 #include <cuda.h>
 #include <nvrtc.h>
+#include <nvml.h>
 
 #include "enumerate.hpp"
 
@@ -52,7 +53,11 @@ public:
   CudaPlatform & operator=(const CudaPlatform &) =delete;
   CudaPlatform(CudaPlatform &&rhs) =default;
   CudaPlatform & operator=(CudaPlatform &&rhs) =default;
-  ~CudaPlatform() =default;
+
+  ~CudaPlatform()
+  {
+    nvmlShutdown();
+  }
 
   int
   device_count() const
@@ -326,6 +331,17 @@ public:
     return std::int64_t(free_mem);
   }
 
+  double // electric power consumed by GPU device, in Watts
+  power() const
+  {
+    unsigned int milliwatts=0;
+    if(nvml_dev_)
+    {
+      nvmlDeviceGetPowerUsage(nvml_dev_, &milliwatts);
+    }
+    return double(milliwatts)*1e-3;
+  }
+
   ~CudaDevice()
   {
     if(current_==this)
@@ -360,6 +376,7 @@ private:
       std::swap(peer_mask_, rhs.peer_mask_);
       std::swap(name_, rhs.name_);
       std::swap(properties_, rhs.properties_);
+      std::swap(nvml_dev_, rhs.nvml_dev_);
     }
     return *this;
   }
@@ -465,6 +482,7 @@ private:
   std::uint64_t peer_mask_{};
   std::string name_{};
   Properties properties_{};
+  nvmlDevice_t nvml_dev_{};
 };
 
 inline
@@ -1468,6 +1486,7 @@ CudaPlatform::CudaPlatform()
 : device_count_{}
 , devices_{}
 {
+  const auto use_nvml=nvmlInit()==NVML_SUCCESS;
   DIM_CUDA_CALL(cuInit, (0));
   DIM_CUDA_CALL(cuDeviceGetCount, (&device_count_));
   // private ctor/dtor --> std::make_unique() unusable
@@ -1744,6 +1763,15 @@ CudaPlatform::CudaPlatform()
     prop.cores_per_multiprocessor=core_counts[last_index][2];
     prop.core_count=prop.multiprocessor_count*
                     prop.cores_per_multiprocessor;
+    if(use_nvml)
+    {
+      char pci_str[0x20]="";
+      std::snprintf(pci_str, sizeof(pci_str)-1, "%.8x:%.2x:%.2x.0",
+                    prop.pci_domain_id,
+                    prop.pci_bus_id,
+                    prop.pci_device_id);
+      nvmlDeviceGetHandleByPciBusId(pci_str, &dev.nvml_dev_);
+    }
   }
   // sort devices to ease peer access
   for(const auto &i: dim::enumerate(device_count_))
