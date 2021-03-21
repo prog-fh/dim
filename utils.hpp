@@ -18,6 +18,9 @@ namespace dim {
 
 constexpr auto assumed_cacheline_size = 64;
 
+template<typename T> class TypeDisplayer;
+#define DIM_DISPLAY_TYPE(expr) dim::TypeDisplayer<decltype((expr))>{};
+
 template<typename T = double>
 inline constexpr
 auto pi()

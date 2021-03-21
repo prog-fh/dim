@@ -31,9 +31,9 @@ inline constexpr
 Real3<RealType>
 operator-(const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{-rhs.x,
-                         -rhs.y,
-                         -rhs.z};
+  return {-rhs.x,
+          -rhs.y,
+          -rhs.z};
 }
 
 template<typename RealType>
@@ -54,9 +54,9 @@ Real3<RealType>
 operator+(const Real3<RealType> &lhs,
           const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{lhs.x+rhs.x,
-                         lhs.y+rhs.y,
-                         lhs.z+rhs.z};
+  return {lhs.x+rhs.x,
+          lhs.y+rhs.y,
+          lhs.z+rhs.z};
 }
 
 template<typename RealType>
@@ -77,9 +77,9 @@ Real3<RealType>
 operator-(const Real3<RealType> &lhs,
           const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{lhs.x-rhs.x,
-                         lhs.y-rhs.y,
-                         lhs.z-rhs.z};
+  return {lhs.x-rhs.x,
+          lhs.y-rhs.y,
+          lhs.z-rhs.z};
 }
 
 template<typename RealType>
@@ -100,9 +100,9 @@ Real3<RealType>
 operator*(const Real3<RealType> &lhs,
           const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{lhs.x*rhs.x,
-                         lhs.y*rhs.y,
-                         lhs.z*rhs.z};
+  return {lhs.x*rhs.x,
+          lhs.y*rhs.y,
+          lhs.z*rhs.z};
 }
 
 template<typename RealType>
@@ -123,9 +123,9 @@ Real3<RealType>
 operator/(const Real3<RealType> &lhs,
           const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{lhs.x/rhs.x,
-                         lhs.y/rhs.y,
-                         lhs.z/rhs.z};
+  return {lhs.x/rhs.x,
+          lhs.y/rhs.y,
+          lhs.z/rhs.z};
 }
 
 template<typename RealType>
@@ -134,9 +134,9 @@ Real3<RealType>
 cross(const Real3<RealType> &lhs,
       const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{lhs.y*rhs.z-lhs.z*rhs.y,
-                         lhs.z*rhs.x-lhs.x*rhs.z,
-                         lhs.x*rhs.y-lhs.y*rhs.x};
+  return {lhs.y*rhs.z-lhs.z*rhs.y,
+          lhs.z*rhs.x-lhs.x*rhs.z,
+          lhs.x*rhs.y-lhs.y*rhs.x};
 }
 
 template<typename RealType>
@@ -193,9 +193,9 @@ Real3<RealType>
 min_coord(const Real3<RealType> &lhs,
           const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{std::min(lhs.x, rhs.x),
-                         std::min(lhs.y, rhs.y),
-                         std::min(lhs.z, rhs.z)};
+  return {std::min(lhs.x, rhs.x),
+          std::min(lhs.y, rhs.y),
+          std::min(lhs.z, rhs.z)};
 }
 
 template<typename RealType>
@@ -204,9 +204,9 @@ Real3<RealType>
 max_coord(const Real3<RealType> &lhs,
           const Real3<RealType> &rhs)
 {
-  return Real3<RealType>{std::max(lhs.x, rhs.x),
-                         std::max(lhs.y, rhs.y),
-                         std::max(lhs.z, rhs.z)};
+  return {std::max(lhs.x, rhs.x),
+          std::max(lhs.y, rhs.y),
+          std::max(lhs.z, rhs.z)};
 }
 
 template<typename RealType>

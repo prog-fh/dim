@@ -48,6 +48,9 @@ public:
   static constexpr auto value_size  = int(sizeof(value_type));
   static constexpr auto value_count = vector_size/value_size;
 
+  static_assert(std::is_same_v<simd_t<value_type, vector_size>, Simd>,
+                "unexpected vector type");
+
   using mask_type = simd_t<
     typename std::conditional_t<value_size==1, std::int8_t,
     typename std::conditional_t<value_size==2, std::int16_t,
