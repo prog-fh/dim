@@ -189,23 +189,23 @@ normalised(const Real3<SimdType> &r3)
 template<typename SimdType>
 inline constexpr
 Real3<SimdType>
-min_coord(const Real3<SimdType> &lhs,
-          const Real3<SimdType> &rhs)
+fmin(const Real3<SimdType> &lhs,
+     const Real3<SimdType> &rhs)
 {
-  return {min(lhs.x, rhs.x),
-          min(lhs.y, rhs.y),
-          min(lhs.z, rhs.z)};
+  return {fmin(lhs.x, rhs.x),
+          fmin(lhs.y, rhs.y),
+          fmin(lhs.z, rhs.z)};
 }
 
 template<typename SimdType>
 inline constexpr
 Real3<SimdType>
-max_coord(const Real3<SimdType> &lhs,
-          const Real3<SimdType> &rhs)
+fmax(const Real3<SimdType> &lhs,
+     const Real3<SimdType> &rhs)
 {
-  return {max(lhs.x, rhs.x),
-          max(lhs.y, rhs.y),
-          max(lhs.z, rhs.z)};
+  return {fmax(lhs.x, rhs.x),
+          fmax(lhs.y, rhs.y),
+          fmax(lhs.z, rhs.z)};
 }
 
 template<typename SimdType>

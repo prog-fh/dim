@@ -18,6 +18,8 @@
 #include <vector>
 #include <iostream>
 
+namespace dim::cuda {
+
 #define DIM_CUDA_THROW(function, error_code)            \
         do                                              \
         {                                               \
@@ -25,7 +27,7 @@
             std::to_string(__LINE__)+':'+__func__+"()"; \
           throw std::runtime_error{                     \
             where+' '+function+"() failure --- "+       \
-            CudaPlatform::error_message((error_code))}; \
+            Platform::error_message((error_code))};     \
         } while(0)
 
 #define DIM_CUDA_CALL(function, args)             \
@@ -38,23 +40,22 @@
           }                                       \
         } while(0)
 
-namespace dim {
 
-class CudaDevice;
+class Device;
 
-class CudaPlatform
+class Platform
 {
 public:
 
   inline // see the code below
-  CudaPlatform();
+  Platform();
 
-  CudaPlatform(const CudaPlatform &) =delete;
-  CudaPlatform & operator=(const CudaPlatform &) =delete;
-  CudaPlatform(CudaPlatform &&rhs) =default;
-  CudaPlatform & operator=(CudaPlatform &&rhs) =default;
+  Platform(const Platform &) =delete;
+  Platform & operator=(const Platform &) =delete;
+  Platform(Platform &&rhs) =default;
+  Platform & operator=(Platform &&rhs) =default;
 
-  ~CudaPlatform()
+  ~Platform()
   {
     nvmlShutdown();
   }
@@ -65,7 +66,7 @@ public:
     return devices_ ? device_count_ : 0;
   }
 
-  const CudaDevice &
+  const Device &
   device(int idx) const
   {
     return devices_[idx];
@@ -79,11 +80,7 @@ public:
     switch(error_code)
     {
 #define DIM_CUDA_ERR_CODE_MSG(code) \
-          case code:         \
-          {                  \
-            error_msg=#code; \
-            break;           \
-          }
+        case code: { error_msg=#code; break; }
       DIM_CUDA_ERR_CODE_MSG(CUDA_SUCCESS)
       DIM_CUDA_ERR_CODE_MSG(CUDA_ERROR_INVALID_VALUE)
       DIM_CUDA_ERR_CODE_MSG(CUDA_ERROR_OUT_OF_MEMORY)
@@ -160,12 +157,12 @@ private:
   static
   std::tuple<void *,      // host pointer
              CUdeviceptr> // device pointer
-  alloc_locked_mem_(bool write_only,
+  alloc_locked_mem_(bool host_write_only,
                     std::intptr_t size)
   {
     // no need to select a specific context with CU_MEMHOSTALLOC_PORTABLE 
     unsigned int flags=CU_MEMHOSTALLOC_PORTABLE|CU_MEMHOSTALLOC_DEVICEMAP;
-    if(write_only)
+    if(host_write_only)
     {
       flags|=CU_MEMHOSTALLOC_WRITECOMBINED;
     }
@@ -184,16 +181,16 @@ private:
     cuMemFreeHost(host_ptr);
   }
 
-  friend class CudaDevice;
-  template<typename T> friend class CudaLockedMem;
+  friend class Device;
+  template<typename T> friend class LockedMem;
 
   int device_count_{};
-  std::unique_ptr<CudaDevice[]> devices_{};
+  std::unique_ptr<Device[]> devices_{};
 };
 
 //----------------------------------------------------------------------------
 
-class CudaDevice
+class Device
 {
 public:
 
@@ -342,7 +339,7 @@ public:
     return double(milliwatts)*1e-3;
   }
 
-  ~CudaDevice()
+  ~Device()
   {
     if(current_==this)
     {
@@ -357,17 +354,17 @@ public:
 
 private:
 
-  CudaDevice() =default;
-  CudaDevice(const CudaDevice &) =delete;
-  CudaDevice & operator=(const CudaDevice &) =delete;
+  Device() =default;
+  Device(const Device &) =delete;
+  Device & operator=(const Device &) =delete;
 
-  CudaDevice(CudaDevice &&rhs) noexcept
-  : CudaDevice{}
+  Device(Device &&rhs) noexcept
+  : Device{}
   {
     *this=std::move(rhs);
   }
 
-  CudaDevice & operator=(CudaDevice &&rhs) noexcept
+  Device & operator=(Device &&rhs) noexcept
   {
     if(this!=&rhs)
     {
@@ -469,13 +466,13 @@ private:
     }
   }
 
-  friend class CudaPlatform;
-  friend class CudaStream;
-  friend class CudaMarker;
-  friend class CudaProgram;
-  template<typename T> friend class CudaBuffer;
+  friend class Platform;
+  friend class Stream;
+  friend class Marker;
+  friend class Program;
+  template<typename T> friend class Buffer;
 
-  inline static const CudaDevice *current_=nullptr;
+  inline static const Device *current_=nullptr;
 
   int id_{-1};
   CUcontext context_{};
@@ -487,7 +484,7 @@ private:
 
 inline
 int // maximal size supported by a 1D block
-max_block_size(const CudaDevice &device)
+max_block_size(const Device &device)
 {
   const auto &prop=device.properties();
   return std::min(prop.max_threads_per_block,
@@ -496,7 +493,7 @@ max_block_size(const CudaDevice &device)
 
 inline
 int // maximal power-of-two size supported by a 1D block
-max_power_of_two_block_size(const CudaDevice &device)
+max_power_of_two_block_size(const Device &device)
 {
   const auto max_sz=max_block_size(device);
   auto sz=device.properties().warp_size;
@@ -509,7 +506,7 @@ max_power_of_two_block_size(const CudaDevice &device)
 
 inline
 int // a generaly suitable block size
-choose_block_size(const CudaDevice &device,
+choose_block_size(const Device &device,
                   bool power_of_two=true)
 {
   (void)power_of_two; // avoid ``unused parameter'' warning
@@ -524,7 +521,7 @@ choose_block_size(const CudaDevice &device,
 
 inline
 int // a generaly suitable block count
-choose_block_count(const CudaDevice &device)
+choose_block_count(const Device &device)
 {
   // FIXME: this hardcoded setting gives good average performances for some
   //        experiments on the actual device used during development.
@@ -536,16 +533,23 @@ choose_block_count(const CudaDevice &device)
 inline
 std::tuple<int, // a generaly suitable block size
            int> // a generaly suitable block count
-choose_layout(const CudaDevice& device,
-              bool power_of_two_block_size=false)
+choose_layout(const Device& device,
+              int work_amount=0)
 {
-  return {choose_block_size(device, power_of_two_block_size),
-          choose_block_count(device)};
+  const auto block_size=choose_block_size(device, true);
+  auto block_count=choose_block_count(device);
+  if((work_amount!=0)&&(work_amount<block_size*block_count))
+  {
+    // ensure work amount is large enough to keep device busy
+    block_count=std::max(device.properties().multiprocessor_count,
+                         (work_amount+block_size-1)/block_size);
+  }
+  return {block_size, block_count};
 }
 
 inline
 std::string
-to_string(const CudaDevice &device)
+to_string(const Device &device)
 {
   const auto &prop=device.properties();
   auto result=std::string{};
@@ -623,13 +627,13 @@ to_string(const CudaDevice &device)
 
 //----------------------------------------------------------------------------
 
-class CudaStream
+class Stream
 {
 public:
 
-  CudaStream() =default;
+  Stream() =default;
 
-  CudaStream(const CudaDevice &device)
+  Stream(const Device &device)
   : device_{&device}
   , stream_{}
   {
@@ -637,16 +641,16 @@ public:
     DIM_CUDA_CALL(cuStreamCreate, (&stream_, CU_STREAM_NON_BLOCKING));
   }
 
-  CudaStream(const CudaStream &) =delete;
-  CudaStream & operator=(const CudaStream &) =delete;
+  Stream(const Stream &) =delete;
+  Stream & operator=(const Stream &) =delete;
 
-  CudaStream(CudaStream &&rhs) noexcept
-  : CudaStream{}
+  Stream(Stream &&rhs) noexcept
+  : Stream{}
   {
     *this=std::move(rhs);
   }
 
-  CudaStream & operator=(CudaStream &&rhs) noexcept
+  Stream & operator=(Stream &&rhs) noexcept
   {
     if(this!=&rhs)
     {
@@ -656,7 +660,7 @@ public:
     return *this;
   }
 
-  ~CudaStream()
+  ~Stream()
   {
     if(stream_)
     {
@@ -665,7 +669,7 @@ public:
     }
   }
 
-  const CudaDevice &
+  const Device &
   device() const
   {
     return *device_;
@@ -679,23 +683,23 @@ public:
   }
 
 private:
-  friend class CudaMarker;
-  friend class CudaProgram;
-  template<typename T> friend class CudaBuffer;
+  friend class Marker;
+  friend class Program;
+  template<typename T> friend class Buffer;
 
-  const CudaDevice *device_{};
+  const Device *device_{};
   CUstream stream_{};
 };
 
 //----------------------------------------------------------------------------
 
-class CudaMarker
+class Marker
 {
 public:
 
-  CudaMarker() = default;
+  Marker() = default;
 
-  CudaMarker(const CudaDevice &device)
+  Marker(const Device &device)
   : device_{&device}
   , event_{}
   {
@@ -703,16 +707,16 @@ public:
     DIM_CUDA_CALL(cuEventCreate, (&event_, CU_EVENT_DEFAULT));
   }
 
-  CudaMarker(const CudaMarker &) =delete;
-  CudaMarker & operator=(const CudaMarker &) =delete;
+  Marker(const Marker &) =delete;
+  Marker & operator=(const Marker &) =delete;
 
-  CudaMarker(CudaMarker &&rhs) noexcept
-  : CudaMarker{}
+  Marker(Marker &&rhs) noexcept
+  : Marker{}
   {
     *this=std::move(rhs);
   }
 
-  CudaMarker & operator=(CudaMarker &&rhs) noexcept
+  Marker & operator=(Marker &&rhs) noexcept
   {
     if(this!=&rhs)
     {
@@ -722,7 +726,7 @@ public:
     return *this;
   }
 
-  ~CudaMarker()
+  ~Marker()
   {
     if(event_)
     {
@@ -731,21 +735,21 @@ public:
     }
   }
 
-  const CudaDevice &
+  const Device &
   device() const
   {
     return *device_;
   }
 
   void
-  set(CudaStream &stream)
+  set(Stream &stream)
   {
     device_->make_current_();
     DIM_CUDA_CALL(cuEventRecord, (event_, stream.stream_));
   }
 
   void
-  device_sync(CudaStream &stream)
+  device_sync(Stream &stream)
   {
     device_->make_current_(); // FIXME: really necessary?
     DIM_CUDA_CALL(cuStreamWaitEvent, (stream.stream_, event_, 0));
@@ -782,7 +786,7 @@ public:
   }
 
   std::int64_t // microseconds
-  duration(const CudaMarker &previous) const
+  duration(const Marker &previous) const
   {
     // device_->makeCurrent_(); // not necessary
     float milliseconds;
@@ -792,51 +796,51 @@ public:
   }
 
 private:
-  const CudaDevice *device_{};
+  const Device *device_{};
   CUevent event_{};
 };
 
 //----------------------------------------------------------------------------
 
-class CudaProgram
+class Program
 {
 public:
 
-  CudaProgram() =default;
+  Program() =default;
 
-  CudaProgram(const CudaDevice &device,
-              std::string name,
-              std::string source_code,
-              std::string options={},
-              bool prefers_cache_to_shared=true)
-  : CudaProgram{device, std::move(name),
-                std::move(source_code), std::move(options), {},
-                prefers_cache_to_shared}
+  Program(const Device &device,
+          std::string name,
+          std::string source_code,
+          std::string options={},
+          bool prefers_cache_to_shared=true)
+  : Program{device, std::move(name),
+            std::move(source_code), std::move(options), {},
+            prefers_cache_to_shared}
   {
     // nothing more to be done
   }
 
-  CudaProgram(const CudaDevice &device,
-              std::string name,
-              std::vector<std::uint8_t> binary_code,
-              bool prefers_cache_to_shared=true)
-  : CudaProgram{device, std::move(name),
-                {}, {}, std::move(binary_code),
-                prefers_cache_to_shared}
+  Program(const Device &device,
+          std::string name,
+          std::vector<std::uint8_t> binary_code,
+          bool prefers_cache_to_shared=true)
+  : Program{device, std::move(name),
+            {}, {}, std::move(binary_code),
+            prefers_cache_to_shared}
   {
     // nothing more to be done
   }
 
-  CudaProgram(const CudaProgram &) =delete;
-  CudaProgram & operator=(const CudaProgram &) =delete;
+  Program(const Program &) =delete;
+  Program & operator=(const Program &) =delete;
 
-  CudaProgram(CudaProgram &&rhs) noexcept
-  : CudaProgram{}
+  Program(Program &&rhs) noexcept
+  : Program{}
   {
     *this=std::move(rhs);
   }
 
-  CudaProgram & operator=(CudaProgram &&rhs) noexcept
+  Program & operator=(Program &&rhs) noexcept
   {
     if(this!=&rhs)
     {
@@ -853,7 +857,7 @@ public:
     return *this;
   }
 
-  ~CudaProgram()
+  ~Program()
   {
     if(module_)
     {
@@ -882,7 +886,7 @@ public:
     return properties_;
   }
 
-  const CudaDevice &
+  const Device &
   device() const
   {
     return *device_;
@@ -931,7 +935,7 @@ public:
   }
 
   void
-  launch(CudaStream &stream,
+  launch(Stream &stream,
          int x_block_count,
          int y_block_count,
          int z_block_count,
@@ -952,7 +956,7 @@ public:
   }
 
   void
-  launch(CudaStream &stream,
+  launch(Stream &stream,
          int x_block_count,
          int y_block_count,
          int x_block_size,
@@ -967,7 +971,7 @@ public:
   }
 
   void
-  launch(CudaStream &stream,
+  launch(Stream &stream,
          int block_count,
          int block_size,
          int shared_memory_size,
@@ -981,12 +985,12 @@ public:
 
 private:
 
-  CudaProgram(const CudaDevice &device,
-              std::string name,
-              std::string source_code,
-              std::string options,
-              std::vector<std::uint8_t> binary_code,
-              bool prefers_cache_to_shared)
+  Program(const Device &device,
+          std::string name,
+          std::string source_code,
+          std::string options,
+          std::vector<std::uint8_t> binary_code,
+          bool prefers_cache_to_shared)
   : device_{&device}
   , name_{std::move(name)}
   , source_code_{std::move(source_code)}
@@ -1139,7 +1143,7 @@ private:
       if(cu_result!=CUDA_SUCCESS)
       {
         build_log_+="cuModuleLoadData() failure: "+
-                    CudaPlatform::error_message(cu_result)+'\n';
+                    Platform::error_message(cu_result)+'\n';
       }
     }
     if(module_)
@@ -1148,7 +1152,7 @@ private:
       if(cu_result!=CUDA_SUCCESS)
       {
         build_log_+="cuModuleGetFunction() failure: "+
-                    CudaPlatform::error_message(cu_result)+'\n';
+                    Platform::error_message(cu_result)+'\n';
       }
     }
     if(kernel_)
@@ -1184,7 +1188,7 @@ private:
     }
   }
 
-  const CudaDevice *device_{};
+  const Device *device_{};
   std::string name_{};
   std::string source_code_{};
   std::string options_{};
@@ -1198,7 +1202,7 @@ private:
 
 inline
 std::string
-to_string(const CudaProgram &program)
+to_string(const Program &program)
 {
   const auto &prop=program.properties();
   auto result=std::string{};
@@ -1221,17 +1225,17 @@ to_string(const CudaProgram &program)
 //----------------------------------------------------------------------------
 
 template<typename T>
-class CudaBuffer
+class Buffer
 {
 public:
 
   static_assert(std::is_standard_layout_v<T>&&std::is_trivial_v<T>,
                 "plain-old-data type expected");
 
-  CudaBuffer() =default;
+  Buffer() =default;
 
-  CudaBuffer(const CudaDevice &device,
-             std::intptr_t size)
+  Buffer(const Device &device,
+         std::intptr_t size)
   : device_{&device}
   , dev_ptr_{}
   , size_{size}
@@ -1239,16 +1243,16 @@ public:
     dev_ptr_=device_->alloc_buffer_(size_*sizeof(T));
   }
 
-  CudaBuffer(const CudaBuffer &) =delete;
-  CudaBuffer & operator=(const CudaBuffer &) =delete;
+  Buffer(const Buffer &) =delete;
+  Buffer & operator=(const Buffer &) =delete;
 
-  CudaBuffer(CudaBuffer &&rhs) noexcept
-  : CudaBuffer{}
+  Buffer(Buffer &&rhs) noexcept
+  : Buffer{}
   {
     *this=std::move(rhs);
   }
 
-  CudaBuffer & operator=(CudaBuffer &&rhs) noexcept
+  Buffer & operator=(Buffer &&rhs) noexcept
   {
     if(this!=&rhs)
     {
@@ -1259,7 +1263,7 @@ public:
     return *this;
   }
 
-  ~CudaBuffer()
+  ~Buffer()
   {
     if(dev_ptr_)
     {
@@ -1267,7 +1271,7 @@ public:
     }
   }
 
-  const CudaDevice &
+  const Device &
   device() const
   {
     return *device_;
@@ -1294,7 +1298,7 @@ public:
   }
 
   void
-  from_host(CudaStream &stream,
+  from_host(Stream &stream,
             const T *host_src,
             std::intptr_t size=0,
             std::intptr_t dst_offset=0,
@@ -1309,7 +1313,7 @@ public:
   }
 
   void
-  to_host(CudaStream &stream,
+  to_host(Stream &stream,
           T *host_dst,
           std::intptr_t size=0,
           std::intptr_t dst_offset=0,
@@ -1324,7 +1328,7 @@ public:
   }
 
   bool // copy to dst_buffer will not involve host
-  direct_copy_available(const CudaBuffer &dst_buffer) const
+  direct_copy_available(const Buffer &dst_buffer) const
   {
     return (dst_buffer.device_==device_)||
            (dst_buffer.device_->peer_mask_&
@@ -1332,8 +1336,8 @@ public:
   }
 
   void
-  to_buffer(CudaStream &stream,
-            CudaBuffer &dst_buffer,
+  to_buffer(Stream &stream,
+            Buffer &dst_buffer,
             std::intptr_t size=0,
             std::intptr_t dst_offset=0,
             std::intptr_t src_offset=0) const
@@ -1353,7 +1357,7 @@ public:
   }
 
 private:
-  const CudaDevice *device_{};
+  const Device *device_{};
   CUdeviceptr dev_ptr_{};
   std::intptr_t size_{};
 };
@@ -1361,55 +1365,55 @@ private:
 //----------------------------------------------------------------------------
 
 template<typename T>
-class CudaLockedMem
+class LockedMem
 {
 public:
 
   static_assert(std::is_standard_layout_v<T>&&std::is_trivial_v<T>,
                 "plain-old-data type expected");
 
-  CudaLockedMem() =default;
+  LockedMem() =default;
 
-  CudaLockedMem(const CudaPlatform &platform,
-                bool write_only,
-                std::intptr_t size)
+  LockedMem(const Platform &platform,
+            bool host_write_only,
+            std::intptr_t size)
   : host_ptr_{}
   , dev_ptr_{}
   , size_{size}
-  , write_only_{write_only}
+  , host_write_only_{host_write_only}
   {
     const auto [host_ptr, dev_ptr]=
-      platform.alloc_locked_mem_(write_only_, size_*sizeof(T));
+      platform.alloc_locked_mem_(host_write_only_, size_*sizeof(T));
     host_ptr_=static_cast<T *>(host_ptr);
     dev_ptr_=dev_ptr;
   }
 
-  CudaLockedMem(const CudaLockedMem &) =delete;
-  CudaLockedMem & operator=(const CudaLockedMem &) =delete;
+  LockedMem(const LockedMem &) =delete;
+  LockedMem & operator=(const LockedMem &) =delete;
 
-  CudaLockedMem(CudaLockedMem &&rhs) noexcept
-  : CudaLockedMem{}
+  LockedMem(LockedMem &&rhs) noexcept
+  : LockedMem{}
   {
     *this=std::move(rhs);
   }
 
-  CudaLockedMem & operator=(CudaLockedMem &&rhs) noexcept
+  LockedMem & operator=(LockedMem &&rhs) noexcept
   {
     if(this!=&rhs)
     {
       std::swap(host_ptr_, rhs.host_ptr_);
       std::swap(dev_ptr_, rhs.dev_ptr_);
       std::swap(size_, rhs.size_);
-      std::swap(write_only_, rhs.write_only_);
+      std::swap(host_write_only_, rhs.host_write_only_);
     }
     return *this;
   }
 
-  ~CudaLockedMem()
+  ~LockedMem()
   {
     if(host_ptr_)
     {
-      CudaPlatform::free_locked_mem_(host_ptr_);
+      Platform::free_locked_mem_(host_ptr_);
     }
   }
 
@@ -1427,9 +1431,9 @@ public:
   auto cend()   const { return data()+size();  }
 
   bool
-  write_only() const
+  host_write_only() const
   {
-    return write_only_;
+    return host_write_only_;
   }
 
   const void * // host memory as zero-copy buffer program argument
@@ -1442,47 +1446,25 @@ private:
   T *host_ptr_{};
   CUdeviceptr dev_ptr_{};
   std::intptr_t size_{};
-  bool write_only_{};
+  bool host_write_only_{};
 };
 
 // standard array-like non-member functions
-
-template<typename T>
-auto data(        CudaLockedMem<T> &m) { return m.data();   }
-
-template<typename T>
-auto data(  const CudaLockedMem<T> &m) { return m.data();   }
-
-template<typename T>
-auto cdata( const CudaLockedMem<T> &m) { return m.cdata();  }
-
-template<typename T>
-auto size(  const CudaLockedMem<T> &m) { return m.size();   }
-
-template<typename T>
-auto empty( const CudaLockedMem<T> &m) { return m.empty();  }
-
-template<typename T>
-auto begin(       CudaLockedMem<T> &m) { return m.begin();  }
-
-template<typename T>
-auto begin( const CudaLockedMem<T> &m) { return m.begin();  }
-
-template<typename T>
-auto cbegin(const CudaLockedMem<T> &m) { return m.cbegin(); }
-
-template<typename T>
-auto end(         CudaLockedMem<T> &m) { return m.end();    }
-
-template<typename T>
-auto end(   const CudaLockedMem<T> &m) { return m.end();    }
-
-template<typename T>
-auto cend(  const CudaLockedMem<T> &m) { return m.cend();   }
+template<typename T> auto data  (      LockedMem<T> &m) { return m.data();   }
+template<typename T> auto data  (const LockedMem<T> &m) { return m.data();   }
+template<typename T> auto cdata (const LockedMem<T> &m) { return m.cdata();  }
+template<typename T> auto size  (const LockedMem<T> &m) { return m.size();   }
+template<typename T> auto empty (const LockedMem<T> &m) { return m.empty();  }
+template<typename T> auto begin (      LockedMem<T> &m) { return m.begin();  }
+template<typename T> auto begin (const LockedMem<T> &m) { return m.begin();  }
+template<typename T> auto cbegin(const LockedMem<T> &m) { return m.cbegin(); }
+template<typename T> auto end   (      LockedMem<T> &m) { return m.end();    }
+template<typename T> auto end   (const LockedMem<T> &m) { return m.end();    }
+template<typename T> auto cend  (const LockedMem<T> &m) { return m.cend();   }
 
 //----------------------------------------------------------------------------
 
-CudaPlatform::CudaPlatform()
+Platform::Platform()
 : device_count_{}
 , devices_{}
 {
@@ -1490,7 +1472,7 @@ CudaPlatform::CudaPlatform()
   DIM_CUDA_CALL(cuInit, (0));
   DIM_CUDA_CALL(cuDeviceGetCount, (&device_count_));
   // private ctor/dtor --> std::make_unique() unusable
-  devices_=std::unique_ptr<CudaDevice[]>(new CudaDevice[device_count_]);
+  devices_=std::unique_ptr<Device[]>(new Device[device_count_]);
   for(const auto &i: dim::enumerate(device_count_))
   {
     auto &dev=devices_[i];
@@ -1502,7 +1484,7 @@ CudaPlatform::CudaPlatform()
     if(dev.id_>=int(8*sizeof(dev.peer_mask_)))
     {
       throw std::runtime_error{
-        "insufficient width for CudaDevice.peer_mask_"};
+        "insufficient width for Device.peer_mask_"};
     }
     char name[0x80]="";
     DIM_CUDA_CALL(cuDeviceGetName, (name, sizeof(name), dev.id_));
@@ -1776,11 +1758,11 @@ CudaPlatform::CudaPlatform()
   // sort devices to ease peer access
   for(const auto &i: dim::enumerate(device_count_))
   {
-    CudaDevice *dev=&devices_[i];
-    CudaDevice *best_dev=dev;
+    Device *dev=&devices_[i];
+    Device *best_dev=dev;
     for(const auto &j: dim::enumerate(i+1, device_count_))
     {
-      CudaDevice *other=&devices_[j];
+      Device *other=&devices_[j];
 #define DIM_CUDA_COMPARE_FIELD(f)                             \
         if(other->properties_.f>best_dev->properties_.f) \
         {                                                \
@@ -1802,17 +1784,17 @@ CudaPlatform::CudaPlatform()
     if(best_dev!=dev)
     {
       // private move-operations --> std::swap() unusable
-      CudaDevice tmp{std::move(*dev)};
+      Device tmp{std::move(*dev)};
       *dev=std::move(*best_dev);
       *best_dev=std::move(tmp);
     }
   }
   for(const auto &i: dim::enumerate(device_count_))
   {
-    CudaDevice &dev=devices_[i];
+    Device &dev=devices_[i];
     for(const auto &j: dim::enumerate(i+1, device_count_))
     {
-      CudaDevice &other=devices_[j];
+      Device &other=devices_[j];
       auto can_access=0;
       DIM_CUDA_CALL(cuDeviceCanAccessPeer, (&can_access, dev.id_, other.id_));
       if(can_access)
@@ -1832,7 +1814,10 @@ CudaPlatform::CudaPlatform()
   }
 }
 
-} // namespace dim
+#undef DIM_CUDA_THROW
+#undef DIM_CUDA_CALL
+
+} // namespace dim::cuda
 
 #endif // DIM_CUDA_HPP
 

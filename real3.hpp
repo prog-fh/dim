@@ -190,23 +190,23 @@ normalised(const Real3<RealType> &r3)
 template<typename RealType>
 inline constexpr
 Real3<RealType>
-min_coord(const Real3<RealType> &lhs,
-          const Real3<RealType> &rhs)
+fmin(const Real3<RealType> &lhs,
+     const Real3<RealType> &rhs)
 {
-  return {std::min(lhs.x, rhs.x),
-          std::min(lhs.y, rhs.y),
-          std::min(lhs.z, rhs.z)};
+  return {std::fmin(lhs.x, rhs.x),
+          std::fmin(lhs.y, rhs.y),
+          std::fmin(lhs.z, rhs.z)};
 }
 
 template<typename RealType>
 inline constexpr
 Real3<RealType>
-max_coord(const Real3<RealType> &lhs,
-          const Real3<RealType> &rhs)
+fmax(const Real3<RealType> &lhs,
+     const Real3<RealType> &rhs)
 {
-  return {std::max(lhs.x, rhs.x),
-          std::max(lhs.y, rhs.y),
-          std::max(lhs.z, rhs.z)};
+  return {std::fmax(lhs.x, rhs.x),
+          std::fmax(lhs.y, rhs.y),
+          std::fmax(lhs.z, rhs.z)};
 }
 
 template<typename RealType>

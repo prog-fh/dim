@@ -324,8 +324,8 @@ select(Simd<ConditionVectorType> condition,
 template<typename VectorType>
 inline constexpr
 auto
-min(Simd<VectorType> a,
-    Simd<VectorType> b)
+fmin(Simd<VectorType> a,
+     Simd<VectorType> b)
 {
 #if defined __clang__
   return select(a<b, a , b);
@@ -337,26 +337,26 @@ min(Simd<VectorType> a,
 template<typename VectorType>
 inline constexpr
 auto
-min(Simd<VectorType> a,
-    typename Simd<VectorType>::value_type b)
+fmin(Simd<VectorType> a,
+     typename Simd<VectorType>::value_type b)
 {
-  return min(a, Simd<VectorType>{b});
+  return fmin(a, Simd<VectorType>{b});
 }
 
 template<typename VectorType>
 inline constexpr
 auto
-min(typename Simd<VectorType>::value_type a,
-    Simd<VectorType> b)
+fmin(typename Simd<VectorType>::value_type a,
+     Simd<VectorType> b)
 {
-  return min(Simd<VectorType>{a}, b);
+  return fmin(Simd<VectorType>{a}, b);
 }
 
 template<typename VectorType>
 inline constexpr
 auto
-max(Simd<VectorType> a,
-    Simd<VectorType> b)
+fmax(Simd<VectorType> a,
+     Simd<VectorType> b)
 {
 #if defined __clang__
   return select(a>b, a , b);
@@ -368,19 +368,19 @@ max(Simd<VectorType> a,
 template<typename VectorType>
 inline constexpr
 auto
-max(Simd<VectorType> a,
-    typename Simd<VectorType>::value_type b)
+fmax(Simd<VectorType> a,
+     typename Simd<VectorType>::value_type b)
 {
-  return max(a, Simd<VectorType>{b});
+  return fmax(a, Simd<VectorType>{b});
 }
 
 template<typename VectorType>
 inline constexpr
 auto
-max(typename Simd<VectorType>::value_type a,
-    Simd<VectorType> b)
+fmax(typename Simd<VectorType>::value_type a,
+     Simd<VectorType> b)
 {
-  return max(Simd<VectorType>{a}, b);
+  return fmax(Simd<VectorType>{a}, b);
 }
 
 //~~~~ explicit initialisation ~~~~
@@ -932,7 +932,7 @@ transform(Simd<VectorType> s,
           return transform(s, static_cast<value_t (*)(value_t)>(std::name)); \
         }
 
-DIM_SIMD_TRANSFORM_STD_MATH(abs)
+DIM_SIMD_TRANSFORM_STD_MATH(fabs)
 DIM_SIMD_TRANSFORM_STD_MATH(exp)
 DIM_SIMD_TRANSFORM_STD_MATH(log)
 DIM_SIMD_TRANSFORM_STD_MATH(sqrt)
@@ -984,12 +984,12 @@ horizontal_product(const Simd<VectorType> &s)
 template<typename VectorType>
 inline
 auto
-horizontal_min(const Simd<VectorType> &s)
+horizontal_fmin(const Simd<VectorType> &s)
 {
   auto min_elem=s[0];
   for(auto i=0; i<s.value_count; ++i)
   {
-    min_elem=std::min(min_elem, s[i]);
+    min_elem=std::fmin(min_elem, s[i]);
   }
   return min_elem;
 }
@@ -997,12 +997,12 @@ horizontal_min(const Simd<VectorType> &s)
 template<typename VectorType>
 inline
 auto
-horizontal_max(const Simd<VectorType> &s)
+horizontal_fmax(const Simd<VectorType> &s)
 {
   auto max_elem=s[0];
   for(auto i=0; i<s.value_count; ++i)
   {
-    max_elem=std::max(max_elem, s[i]);
+    max_elem=std::fmax(max_elem, s[i]);
   }
   return max_elem;
 }
