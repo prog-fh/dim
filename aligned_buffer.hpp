@@ -32,8 +32,14 @@ public:
 
   static constexpr auto alignment=Alignment;
 
+  AlignedBuffer()
+  : AlignedBuffer{0}
+  {
+    // nothing more to be done
+  }
+
   explicit
-  AlignedBuffer(int count=0)
+  AlignedBuffer(int count)
   : count_{count}
   , data_{}
   {
