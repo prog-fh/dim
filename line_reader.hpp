@@ -173,7 +173,7 @@ private:
     auto stream=std::ifstream{path};
     if(!stream)
     {
-      const auto rel_path=relative_path(path);
+      auto rel_path=relative_path(path);
       if(rel_path!=path)
       {
         stream=std::ifstream{rel_path};
