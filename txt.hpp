@@ -747,7 +747,7 @@ read_all(int capacity)
   auto remaining=capacity;
   while(remaining)
   {
-    auto r=::read(STDIN_FILENO, ptr, remaining);
+    auto r=int(::read(STDIN_FILENO, ptr, remaining));
     if(r<=0)
     {
       break; // EOF
