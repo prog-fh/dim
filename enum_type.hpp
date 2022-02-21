@@ -76,10 +76,10 @@ public:
   }
 
   EnumType(const EnumType &rhs)
-  : rank_{rhs.rank_}
-  , storage_{}
+  : EnumType{}
   {
     copy_init_<Types...>(rank_, rhs);
+    rank_=rhs.rank_;
   }
 
   EnumType &
@@ -88,17 +88,18 @@ public:
     if(&rhs!=this)
     {
       destroy_<Types...>(rank_);
-      rank_=rhs.rank_;
+      rank_=0;
       copy_init_<Types...>(rank_, rhs);
+      rank_=rhs.rank_;
     }
     return *this;
   }
 
   EnumType(EnumType &&rhs) noexcept
-  : rank_{rhs.rank_}
-  , storage_{}
+  : EnumType{}
   {
     move_init_<Types...>(rank_, std::move(rhs));
+    rank_=rhs.rank_;
     rhs.rank_=0;
   }
 
@@ -108,8 +109,9 @@ public:
     if(&rhs!=this)
     {
       destroy_<Types...>(rank_);
-      rank_=rhs.rank_;
+      rank_=0;
       move_init_<Types...>(rank_, std::move(rhs));
+      rank_=rhs.rank_;
       rhs.rank_=0;
     }
     return *this;
@@ -155,8 +157,9 @@ public:
   set(Args &&...args)
   {
     destroy_<Types...>(rank_);
-    rank_=TypeRank_v<T, void, Types...>;
+    rank_=0;
     new (&storage_) T(std::forward<Args>(args)...);
+    rank_=TypeRank_v<T, void, Types...>;
   }
 
   void
