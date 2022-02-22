@@ -286,11 +286,33 @@ txt(const char *format,
 template<typename ...Args>
 inline
 int // written bytes
+to_fd(int fd,
+      const char *format,
+      Args &&...args)
+{
+  const auto str=txt(format, std::forward<Args>(args)...);
+  auto ptr=data(str);
+  auto remaining=int(size(str));
+  while(remaining)
+  {
+    const auto r=int(::write(fd, ptr, remaining));
+    if(r<=0)
+    {
+      break; // error
+    }
+    ptr+=r;
+    remaining-=r;
+  }
+  return int(size(str))-remaining;
+}
+
+template<typename ...Args>
+inline
+int // written bytes
 out(const char *format,
     Args &&...args)
 {
-  const auto str=txt(format, std::forward<Args>(args)...);
-  return int(::write(STDOUT_FILENO, data(str), size(str)));
+  return to_fd(STDOUT_FILENO, format, std::forward<Args>(args)...);
 }
 
 template<typename ...Args>
@@ -299,8 +321,7 @@ int // written bytes
 err(const char *format,
     Args &&...args)
 {
-  const auto str=txt(format, std::forward<Args>(args)...);
-  return int(::write(STDERR_FILENO, data(str), size(str)));
+  return to_fd(STDERR_FILENO, format, std::forward<Args>(args)...);
 }
 
 //----------------------------------------------------------------------------
@@ -705,34 +726,12 @@ extract(const char *input,
 
 //----------------------------------------------------------------------------
 
-namespace impl_ {
-
-template<typename Elem>
-inline
-void
-uninitialised_resize_(std::basic_string<Elem> &s,
-                      typename std::basic_string<Elem>::size_type sz)
-{
-  static_assert(std::is_pod_v<Elem>,
-                "plain-old-data elements expected");
-  struct PodElem
-  {
-    Elem uninitialised;
-    PodElem() { }; // disable zero-initialisation
-  };
-  s.reserve(sz);
-  auto &raw=reinterpret_cast<std::basic_string<PodElem> &>(s);
-  raw.resize(sz);
-}
-
-} // namespace impl_
-
 inline
 std::string
 read(int capacity=0x100)
 {
   auto result=std::string{};
-  impl_::uninitialised_resize_(result, capacity);
+  result.resize(capacity);
   result.resize(::read(STDIN_FILENO, data(result), capacity));
   return result;
 }
@@ -742,12 +741,12 @@ std::string
 read_all(int capacity)
 {
   auto result=std::string{};
-  impl_::uninitialised_resize_(result, capacity);
+  result.resize(capacity);
   auto ptr=data(result);
   auto remaining=capacity;
   while(remaining)
   {
-    auto r=int(::read(STDIN_FILENO, ptr, remaining));
+    const auto r=int(::read(STDIN_FILENO, ptr, remaining));
     if(r<=0)
     {
       break; // EOF
