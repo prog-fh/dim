@@ -5,6 +5,7 @@
 
 #include <type_traits>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <cmath>
 #include <utility>
@@ -85,6 +86,14 @@ inline
 void
 fmt(std::string &inout_result,
     const char *value)
+{
+  inout_result+=value;
+}
+
+inline
+void
+fmt(std::string &inout_result,
+    std::string_view value)
 {
   inout_result+=value;
 }
@@ -697,6 +706,22 @@ template<typename ...Args>
 inline
 int // extraction count
 extract(const std::string &input,
+        Args &&...args)
+{
+  auto input_ptr=data(input);
+  auto remaining=int(size(input));
+  auto failure=false;
+  auto count=0;
+  impl_::variadic_pass_{
+    (impl_::extract_arg_(input_ptr, remaining, failure, count,
+                         std::forward<Args>(args)), 1)...};
+  return count;
+}
+
+template<typename ...Args>
+inline
+int // extraction count
+extract(std::string_view input,
         Args &&...args)
 {
   auto input_ptr=data(input);
